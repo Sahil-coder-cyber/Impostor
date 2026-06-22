@@ -1,0 +1,11 @@
+Specification
+
+I want to make a multiplayer game called impostor 
+
+Players: 
+in which out of multiple people there will one impostor and all other civillians 
+
+the civillians will all get a same random word. the impostor will not get the word instead he has to guess what the word is before the civillians vote out the impostor. 
+
+Playing:
+ to start the game, there will be two options on the web page either start a game or join a game. if u choose start a game then after u click on it there should be a new page in which in the center there will be the usernames of the people and a random code of 5 digits. The person who started the game will be roled host the other players will be roled player the player who started the game, can start the game whenever he wants. But there shouold be at least at more than three players.

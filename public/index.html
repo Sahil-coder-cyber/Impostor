@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Impostor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="top-bar">
+    <span id="guest-name" class="guest-name"></span>
+    <div class="top-bar-right">
+      <button class="signin-btn" onclick="showScreen('screen-signup')">Sign In</button>
+      <button class="signin-btn" onclick="showScreen('screen-login')">Login</button>
+    </div>
+  </header>
+
+  <!-- LANDING -->
+  <div id="screen-landing" class="screen active">
+    <h1 class="title">IMPOSTOR</h1>
+    <div class="btn-group">
+      <button onclick="showScreen('screen-name', 'start')">Start Game</button>
+      <button onclick="showScreen('screen-name', 'join')">Join Game</button>
+    </div>
+  </div>
+
+  <!-- NAME INPUT -->
+  <div id="screen-name" class="screen">
+    <h2 id="name-heading"></h2>
+    <input id="input-name" type="text" placeholder="Your name" maxlength="16" />
+    <input id="input-code" type="text" placeholder="5-digit room code" maxlength="5" style="display:none" />
+    <button id="btn-name-go" onclick="nameGo()">Continue</button>
+    <p class="error" id="err-name"></p>
+    <button class="back-btn" onclick="showScreen('screen-landing')">Back</button>
+  </div>
+
+  <!-- SIGN IN (create a permanent account) -->
+  <div id="screen-signup" class="screen">
+    <h2>Sign In</h2>
+    <input id="input-signup-username" type="text" placeholder="Username" maxlength="20" />
+    <input id="input-signup-password" type="password" placeholder="Password" maxlength="64" />
+    <button onclick="doSignup()">Continue</button>
+    <p class="error" id="err-signup"></p>
+    <button class="back-btn" onclick="showScreen('screen-landing')">Back</button>
+  </div>
+
+  <!-- LOGIN (use an existing account on another device) -->
+  <div id="screen-login" class="screen">
+    <h2>Login</h2>
+    <input id="input-login-username" type="text" placeholder="Username" maxlength="20" />
+    <input id="input-login-password" type="password" placeholder="Password" maxlength="64" />
+    <button onclick="doLogin()">Continue</button>
+    <p class="error" id="err-login"></p>
+    <button class="back-btn" onclick="showScreen('screen-landing')">Back</button>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="screen-lobby" class="screen">
+    <h2>Waiting Room</h2>
+    <div class="code-box">Room Code: <span id="lobby-code"></span></div>
+    <ul id="lobby-players"></ul>
+    <p id="lobby-host-note"></p>
+    <button id="btn-start" onclick="startGame()" style="display:none">Start Game</button>
+    <p class="error" id="err-lobby"></p>
+  </div>
+
+  <!-- GAME -->
+  <div id="screen-game" class="screen">
+    <h2 id="game-role-title"></h2>
+    <div id="game-word-box" class="word-box"></div>
+    <p id="game-hint"></p>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
