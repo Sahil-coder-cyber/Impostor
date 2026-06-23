@@ -17,7 +17,7 @@ const WORD_LIST = [
   'lantern', 'compass', 'hammock', 'parachute', 'telescope', 'waterfall'
 ];
 
-// rooms[code] = { host, players: [{id, name, eliminated}], started, word, impostorIds, impostorCount, votingActive, votes, guessedIds, gameOver }
+// rooms[code] = { host, players: [{id, name, eliminated}], started, word, impostorIds, impostorCount, votingActive, votes, guessedIds, gameOver, clueOrder, clueIndex, clues, cluePhaseActive, clueTimeout }
 const rooms = {};
 
 function maxImpostors(playerCount) {
@@ -46,6 +46,52 @@ function makeCode() {
   do { code = String(Math.floor(10000 + Math.random() * 90000)); }
   while (rooms[code]);
   return code;
+}
+
+const CLUE_SECONDS = 30;
+
+function startCluePhase(code) {
+  const room = rooms[code];
+  const alive = room.players.filter(p => !p.eliminated);
+  const order = [...alive].sort(() => Math.random() - 0.5).map(p => p.id);
+
+  if (order.length && room.impostorIds.includes(order[0])) {
+    const swapIndex = order.findIndex(id => !room.impostorIds.includes(id));
+    if (swapIndex > 0) [order[0], order[swapIndex]] = [order[swapIndex], order[0]];
+  }
+
+  room.clueOrder = order;
+  room.clueIndex = 0;
+  room.clues = [];
+  room.cluePhaseActive = true;
+  advanceClueTurn(code);
+}
+
+function advanceClueTurn(code) {
+  const room = rooms[code];
+  if (!room || !room.cluePhaseActive) return;
+
+  if (room.clueIndex >= room.clueOrder.length) {
+    room.cluePhaseActive = false;
+    io.to(code).emit('clue_phase_complete');
+    return;
+  }
+
+  const playerId = room.clueOrder[room.clueIndex];
+  const player = room.players.find(p => p.id === playerId);
+  if (!player || player.eliminated) {
+    room.clueIndex++;
+    return advanceClueTurn(code);
+  }
+
+  io.to(code).emit('clue_turn', { playerId, name: player.name, seconds: CLUE_SECONDS });
+  clearTimeout(room.clueTimeout);
+  room.clueTimeout = setTimeout(() => {
+    room.clues.push({ id: playerId, name: player.name, word: null });
+    io.to(code).emit('clue_submitted', { name: player.name, word: null });
+    room.clueIndex++;
+    advanceClueTurn(code);
+  }, CLUE_SECONDS * 1000);
 }
 
 io.on('connection', (socket) => {
@@ -130,12 +176,30 @@ io.on('connection', (socket) => {
         players: room.players.map(pl => ({ id: pl.id, name: pl.name }))
       });
     });
+
+    startCluePhase(code);
+  });
+
+  socket.on('submit_clue', ({ word }) => {
+    const code = socket.data.room;
+    const room = rooms[code];
+    if (!room || !room.cluePhaseActive) return;
+    const currentId = room.clueOrder[room.clueIndex];
+    if (socket.id !== currentId) return;
+    clearTimeout(room.clueTimeout);
+    word = (word || '').trim().slice(0, 30);
+    if (containsProfanity(word)) word = '';
+    const player = room.players.find(p => p.id === socket.id);
+    room.clues.push({ id: socket.id, name: player.name, word: word || null });
+    io.to(code).emit('clue_submitted', { name: player.name, word: word || null });
+    room.clueIndex++;
+    advanceClueTurn(code);
   });
 
   socket.on('call_vote', () => {
     const code = socket.data.room;
     const room = rooms[code];
-    if (!room || !room.started || room.gameOver || room.votingActive) return;
+    if (!room || !room.started || room.gameOver || room.votingActive || room.cluePhaseActive) return;
     const caller = room.players.find(p => p.id === socket.id);
     if (!caller || caller.eliminated) return;
     room.votingActive = true;
@@ -238,14 +302,21 @@ io.on('connection', (socket) => {
     const code = socket.data.room;
     if (!code || !rooms[code]) return;
     const room = rooms[code];
+    const wasCurrentClueTurn = room.cluePhaseActive && room.clueOrder[room.clueIndex] === socket.id;
     room.players = room.players.filter(p => p.id !== socket.id);
     if (room.players.length === 0) {
+      clearTimeout(room.clueTimeout);
       delete rooms[code];
       return;
     }
     if (room.host === socket.id) room.host = room.players[0].id;
     if (!room.started) io.to(code).emit('lobby_update', lobbyState(code));
     else io.to(code).emit('player_left', { name: socket.data.name });
+    if (wasCurrentClueTurn) {
+      clearTimeout(room.clueTimeout);
+      room.clueIndex++;
+      advanceClueTurn(code);
+    }
   });
 });
 

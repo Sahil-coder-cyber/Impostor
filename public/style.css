@@ -185,6 +185,14 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
 
 #guess-area { width: 100%; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 
+.clue-area { width: 100%; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+
+.clue-status-row { display: flex; align-items: center; gap: 12px; justify-content: center; }
+#clue-turn-label { color: #75dbf4; font-size: 1.1rem; text-align: center; }
+.clue-timer { font-weight: 700; color: #ffde2a; font-size: 1.1rem; min-width: 3ch; }
+
+.clue-input-row { width: 100%; display: flex; gap: 10px; }
+
 .vote-target {
   width: 100%;
   text-align: left;

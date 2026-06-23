@@ -86,7 +86,19 @@
       <p class="error" id="guess-status"></p>
     </div>
 
-    <button onclick="callVote()">Call Vote</button>
+    <div id="clue-area" class="clue-area">
+      <div class="clue-status-row">
+        <h3 id="clue-turn-label"></h3>
+        <span id="clue-timer" class="clue-timer"></span>
+      </div>
+      <div id="clue-input-row" class="clue-input-row" style="display:none">
+        <input id="input-clue" type="text" placeholder="A word related to it..." maxlength="30" />
+        <button onclick="submitClue()">Submit</button>
+      </div>
+      <ul id="clue-list" class="player-list"></ul>
+    </div>
+
+    <button id="btn-call-vote" onclick="callVote()" style="display:none">Call Vote</button>
   </div>
 
   <!-- VOTE -->

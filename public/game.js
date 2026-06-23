@@ -156,6 +156,58 @@ socket.on('game_started', ({ word, isImpostor, fellowImpostors, players }) => {
   }
 
   setupChat(players, isImpostor && fellowImpostors && fellowImpostors.length > 0);
+
+  document.getElementById('clue-list').innerHTML = '';
+  document.getElementById('clue-turn-label').textContent = '';
+  document.getElementById('clue-timer').textContent = '';
+  document.getElementById('clue-input-row').style.display = 'none';
+  document.getElementById('btn-call-vote').style.display = 'none';
+  clearInterval(clueTimerInterval);
+});
+
+// ---- Clue round ----
+
+let clueTimerInterval = null;
+
+socket.on('clue_turn', ({ playerId, name, seconds }) => {
+  const isMyTurn = playerId === socket.id;
+  document.getElementById('clue-turn-label').textContent = isMyTurn
+    ? 'Your turn — type a word related to the secret word!'
+    : `${name}'s turn...`;
+  document.getElementById('clue-input-row').style.display = isMyTurn ? 'flex' : 'none';
+  document.getElementById('input-clue').value = '';
+
+  clearInterval(clueTimerInterval);
+  let timeLeft = seconds;
+  document.getElementById('clue-timer').textContent = timeLeft + 's';
+  clueTimerInterval = setInterval(() => {
+    timeLeft--;
+    document.getElementById('clue-timer').textContent = Math.max(timeLeft, 0) + 's';
+    if (timeLeft <= 0) clearInterval(clueTimerInterval);
+  }, 1000);
+});
+
+function submitClue() {
+  const word = document.getElementById('input-clue').value.trim();
+  if (!word) return;
+  socket.emit('submit_clue', { word });
+  document.getElementById('clue-input-row').style.display = 'none';
+}
+
+document.getElementById('input-clue').addEventListener('keydown', e => { if (e.key === 'Enter') submitClue(); });
+
+socket.on('clue_submitted', ({ name, word }) => {
+  const li = document.createElement('li');
+  li.textContent = word ? `${name}: ${word}` : `${name}: (no answer)`;
+  document.getElementById('clue-list').appendChild(li);
+});
+
+socket.on('clue_phase_complete', () => {
+  clearInterval(clueTimerInterval);
+  document.getElementById('clue-turn-label').textContent = 'Clue round finished — discuss, then call a vote!';
+  document.getElementById('clue-timer').textContent = '';
+  document.getElementById('clue-input-row').style.display = 'none';
+  document.getElementById('btn-call-vote').style.display = 'block';
 });
 
 // ---- Chat ----
