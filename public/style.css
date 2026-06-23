@@ -269,3 +269,20 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
 .chat-input-row button { padding: 8px 14px; font-size: 0.85rem; }
 
 #chat-error { font-size: 0.75rem; }
+
+.qr-corner {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background: rgba(15, 11, 22, 0.92);
+  border: 1.5px solid #3a2f4d;
+  border-radius: 10px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 10;
+}
+.qr-corner img { width: 90px; height: 90px; border-radius: 4px; }
+.qr-corner span { font-size: 0.7rem; color: #b9aed1; }

@@ -13,6 +13,9 @@ function getGuestName() {
 }
 document.getElementById('guest-name').textContent = getGuestName();
 
+document.getElementById('qr-code').src =
+  `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(window.location.origin)}`;
+
 function showScreen(id, context) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
