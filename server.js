@@ -17,7 +17,7 @@ const WORD_LIST = [
   'lantern', 'compass', 'hammock', 'parachute', 'telescope', 'waterfall'
 ];
 
-// rooms[code] = { host, players: [{id, name}], started, word, impostorId }
+// rooms[code] = { host, players: [{id, name, eliminated}], started, word, impostorId, votingActive, votes, guessUsed, gameOver }
 const rooms = {};
 
 // users[usernameLowercase] = { salt, hash, displayName }
@@ -88,6 +88,11 @@ io.on('connection', (socket) => {
     room.word = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
     const impostorIndex = Math.floor(Math.random() * room.players.length);
     room.impostorId = room.players[impostorIndex].id;
+    room.players.forEach(p => { p.eliminated = false; });
+    room.votingActive = false;
+    room.votes = {};
+    room.guessUsed = false;
+    room.gameOver = false;
 
     room.players.forEach(p => {
       io.to(p.id).emit('game_started', {
@@ -95,6 +100,80 @@ io.on('connection', (socket) => {
         isImpostor: p.id === room.impostorId
       });
     });
+  });
+
+  socket.on('call_vote', () => {
+    const code = socket.data.room;
+    const room = rooms[code];
+    if (!room || !room.started || room.gameOver || room.votingActive) return;
+    const caller = room.players.find(p => p.id === socket.id);
+    if (!caller || caller.eliminated) return;
+    room.votingActive = true;
+    room.votes = {};
+    const alive = room.players.filter(p => !p.eliminated);
+    io.to(code).emit('voting_started', { players: alive.map(p => ({ id: p.id, name: p.name })) });
+  });
+
+  socket.on('cast_vote', ({ target }) => {
+    const code = socket.data.room;
+    const room = rooms[code];
+    if (!room || !room.votingActive) return;
+    const voter = room.players.find(p => p.id === socket.id);
+    if (!voter || voter.eliminated || room.votes[socket.id]) return;
+    room.votes[socket.id] = target;
+
+    const alive = room.players.filter(p => !p.eliminated);
+    if (Object.keys(room.votes).length < alive.length) return;
+
+    // Tally votes
+    const tally = {};
+    Object.values(room.votes).forEach(t => { tally[t] = (tally[t] || 0) + 1; });
+    let winner = 'skip';
+    let topCount = tally['skip'] || 0;
+    let tied = false;
+    for (const [t, count] of Object.entries(tally)) {
+      if (t === 'skip') continue;
+      if (count > topCount) { winner = t; topCount = count; tied = false; }
+      else if (count === topCount) { tied = true; }
+    }
+
+    room.votingActive = false;
+
+    if (winner === 'skip' || tied) {
+      io.to(code).emit('vote_result', { skipped: true });
+      return;
+    }
+
+    const ejected = room.players.find(p => p.id === winner);
+    ejected.eliminated = true;
+    const wasImpostor = ejected.id === room.impostorId;
+    io.to(code).emit('vote_result', { skipped: false, ejectedName: ejected.name, wasImpostor });
+
+    if (wasImpostor) {
+      room.gameOver = true;
+      io.to(code).emit('game_over', { winner: 'civilians', reason: 'The impostor was voted out.' });
+      return;
+    }
+
+    const aliveCiviliansLeft = room.players.filter(p => !p.eliminated && p.id !== room.impostorId).length;
+    if (aliveCiviliansLeft === 0) {
+      room.gameOver = true;
+      io.to(code).emit('game_over', { winner: 'impostor', reason: 'All civilians have been eliminated.' });
+    }
+  });
+
+  socket.on('submit_guess', ({ guess }) => {
+    const code = socket.data.room;
+    const room = rooms[code];
+    if (!room || !room.started || room.gameOver || room.guessUsed) return;
+    if (socket.id !== room.impostorId) return;
+    room.guessUsed = true;
+    const correct = (guess || '').trim().toLowerCase() === room.word.toLowerCase();
+    socket.emit('guess_result', { correct });
+    if (correct) {
+      room.gameOver = true;
+      io.to(code).emit('game_over', { winner: 'impostor', reason: 'The impostor guessed the word.' });
+    }
   });
 
   socket.on('disconnect', () => {

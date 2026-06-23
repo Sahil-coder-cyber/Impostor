@@ -59,7 +59,7 @@
   <div id="screen-lobby" class="screen">
     <h2>Waiting Room</h2>
     <div class="code-box">Room Code: <span id="lobby-code"></span></div>
-    <ul id="lobby-players"></ul>
+    <ul id="lobby-players" class="player-list"></ul>
     <p id="lobby-host-note"></p>
     <button id="btn-start" onclick="startGame()" style="display:none">Start Game</button>
     <p class="error" id="err-lobby"></p>
@@ -70,6 +70,29 @@
     <h2 id="game-role-title"></h2>
     <div id="game-word-box" class="word-box"></div>
     <p id="game-hint"></p>
+
+    <div id="guess-area" style="display:none">
+      <input id="input-guess" type="text" placeholder="Guess the word" maxlength="20" />
+      <button onclick="submitGuess()">Submit Guess</button>
+      <p class="error" id="guess-status"></p>
+    </div>
+
+    <button onclick="callVote()">Call Vote</button>
+  </div>
+
+  <!-- VOTE -->
+  <div id="screen-vote" class="screen">
+    <h2>Time to Vote</h2>
+    <ul id="vote-players" class="player-list"></ul>
+    <button class="skip-btn" onclick="castVote('skip')">Skip Vote</button>
+    <p id="vote-status"></p>
+  </div>
+
+  <!-- RESULT -->
+  <div id="screen-result" class="screen">
+    <h2 id="result-title"></h2>
+    <p id="result-detail"></p>
+    <button id="btn-result-continue" onclick="continueAfterVote()">Continue</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

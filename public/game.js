@@ -87,6 +87,7 @@ document.getElementById('input-signup-username').addEventListener('keydown', e =
 document.getElementById('input-signup-password').addEventListener('keydown', e => { if (e.key === 'Enter') doSignup(); });
 document.getElementById('input-login-username').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 document.getElementById('input-login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('input-guess').addEventListener('keydown', e => { if (e.key === 'Enter') submitGuess(); });
 
 // Socket events
 
@@ -122,16 +123,91 @@ socket.on('lobby_update', ({ players, host }) => {
 
 socket.on('game_started', ({ word, isImpostor }) => {
   showScreen('screen-game');
+  const guessArea = document.getElementById('guess-area');
+  document.getElementById('input-guess').value = '';
+  document.getElementById('guess-status').textContent = '';
+
   if (isImpostor) {
     document.getElementById('game-role-title').textContent = 'You are the IMPOSTOR';
     document.getElementById('game-word-box').textContent = '???';
     document.getElementById('game-hint').textContent = 'You have no word. Listen carefully and blend in. Try to guess the word before you get voted out!';
+    guessArea.style.display = 'flex';
   } else {
     document.getElementById('game-role-title').textContent = 'You are a CIVILIAN';
     document.getElementById('game-word-box').textContent = word.toUpperCase();
     document.getElementById('game-hint').textContent = 'This is your secret word. Discuss without giving it away — find the impostor!';
+    guessArea.style.display = 'none';
   }
 });
+
+function callVote() {
+  socket.emit('call_vote');
+}
+
+function castVote(target) {
+  socket.emit('cast_vote', { target });
+  document.getElementById('vote-status').textContent = 'Vote submitted. Waiting for others...';
+  document.querySelectorAll('.vote-target, .skip-btn').forEach(btn => btn.disabled = true);
+}
+
+function submitGuess() {
+  const guess = document.getElementById('input-guess').value.trim();
+  if (!guess) return;
+  socket.emit('submit_guess', { guess });
+}
+
+let lastVoteWasGameOver = false;
+
+socket.on('voting_started', ({ players }) => {
+  showScreen('screen-vote');
+  document.getElementById('vote-status').textContent = '';
+  const ul = document.getElementById('vote-players');
+  ul.innerHTML = '';
+  players.forEach(p => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.className = 'vote-target';
+    btn.textContent = p.name;
+    btn.onclick = () => castVote(p.id);
+    li.appendChild(btn);
+    ul.appendChild(li);
+  });
+});
+
+socket.on('vote_result', ({ skipped, ejectedName, wasImpostor }) => {
+  lastVoteWasGameOver = false;
+  showScreen('screen-result');
+  if (skipped) {
+    document.getElementById('result-title').textContent = 'Vote Skipped';
+    document.getElementById('result-detail').textContent = 'No one was voted out. Back to discussion.';
+  } else {
+    document.getElementById('result-title').textContent = `${ejectedName} was voted out`;
+    document.getElementById('result-detail').textContent = wasImpostor
+      ? `${ejectedName} was the IMPOSTOR!`
+      : `${ejectedName} was NOT the impostor.`;
+  }
+  document.getElementById('btn-result-continue').textContent = 'Continue';
+});
+
+socket.on('guess_result', ({ correct }) => {
+  document.getElementById('guess-status').textContent = correct ? 'Correct!' : 'Wrong guess. You cannot guess again.';
+});
+
+socket.on('game_over', ({ winner, reason }) => {
+  lastVoteWasGameOver = true;
+  showScreen('screen-result');
+  document.getElementById('result-title').textContent = winner === 'civilians' ? 'Civilians Win!' : 'Impostor Wins!';
+  document.getElementById('result-detail').textContent = reason;
+  document.getElementById('btn-result-continue').textContent = 'Back to Home';
+});
+
+function continueAfterVote() {
+  if (lastVoteWasGameOver) {
+    showScreen('screen-landing');
+  } else {
+    showScreen('screen-game');
+  }
+}
 
 socket.on('player_left', ({ name }) => {
   const hint = document.getElementById('game-hint');
