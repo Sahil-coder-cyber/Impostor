@@ -99,6 +99,7 @@ socket.on('room_created', ({ code }) => {
   showScreen('screen-lobby');
   document.getElementById('btn-start').style.display = 'block';
   document.getElementById('lobby-host-note').textContent = 'You are the host. Share the code above.';
+  document.getElementById('qr-corner').style.display = 'flex';
 });
 
 socket.on('room_joined', ({ code }) => {
@@ -106,6 +107,7 @@ socket.on('room_joined', ({ code }) => {
   showScreen('screen-lobby');
   document.getElementById('btn-start').style.display = 'none';
   document.getElementById('lobby-host-note').textContent = 'Waiting for the host to start...';
+  document.getElementById('qr-corner').style.display = 'flex';
 });
 
 let currentMaxImpostors = 1;
@@ -399,6 +401,7 @@ function continueAfterVote() {
   if (lastVoteWasGameOver) {
     showScreen('screen-landing');
     hideChat();
+    document.getElementById('qr-corner').style.display = 'none';
   } else {
     showScreen('screen-game');
   }
