@@ -104,6 +104,23 @@
     <button id="btn-result-continue" onclick="continueAfterVote()">Continue</button>
   </div>
 
+  <!-- CHAT (persists across game/vote/result screens) -->
+  <div id="chat-panel" class="chat-panel" style="display:none">
+    <div class="chat-tabs" id="chat-tabs">
+      <button class="chat-tab active" data-tab="all" onclick="switchChatTab('all')">All</button>
+      <button class="chat-tab" data-tab="impostor" id="chat-tab-impostor" style="display:none" onclick="switchChatTab('impostor')">Impostors</button>
+    </div>
+    <select id="dm-target-select" onchange="openDmFromSelect()">
+      <option value="">Start a private chat...</option>
+    </select>
+    <div id="chat-messages" class="chat-messages"></div>
+    <div class="chat-input-row">
+      <input id="chat-input" type="text" placeholder="Type a message..." maxlength="200" />
+      <button onclick="sendChatMessage()">Send</button>
+    </div>
+    <p class="error" id="chat-error"></p>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="game.js"></script>
 </body>

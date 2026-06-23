@@ -135,7 +135,7 @@ function changeImpostorCount(delta) {
   socket.emit('set_impostor_count', { count: next });
 }
 
-socket.on('game_started', ({ word, isImpostor, fellowImpostors }) => {
+socket.on('game_started', ({ word, isImpostor, fellowImpostors, players }) => {
   showScreen('screen-game');
   const guessArea = document.getElementById('guess-area');
   document.getElementById('input-guess').value = '';
@@ -154,6 +154,129 @@ socket.on('game_started', ({ word, isImpostor, fellowImpostors }) => {
     document.getElementById('game-hint').textContent = 'This is your secret word. Discuss without giving it away — find the impostor!';
     guessArea.style.display = 'none';
   }
+
+  setupChat(players, isImpostor && fellowImpostors && fellowImpostors.length > 0);
+});
+
+// ---- Chat ----
+
+let chatTab = 'all';
+let chatLogs = { all: [] };
+let roomPlayers = [];
+
+function setupChat(players, hasImpostorChat) {
+  roomPlayers = (players || []).filter(p => p.id !== socket.id);
+  chatLogs = { all: [] };
+  chatTab = 'all';
+
+  document.getElementById('chat-messages').innerHTML = '';
+  document.querySelectorAll('.chat-tab').forEach(b => {
+    if (b.dataset.tab !== 'all' && b.dataset.tab !== 'impostor') b.remove();
+  });
+  document.querySelectorAll('.chat-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'all'));
+
+  const impostorTab = document.getElementById('chat-tab-impostor');
+  if (hasImpostorChat) {
+    impostorTab.style.display = 'inline-block';
+    chatLogs.impostor = [];
+  } else {
+    impostorTab.style.display = 'none';
+  }
+
+  const dmSelect = document.getElementById('dm-target-select');
+  dmSelect.innerHTML = '<option value="">Start a private chat...</option>';
+  roomPlayers.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    dmSelect.appendChild(opt);
+  });
+
+  document.getElementById('chat-panel').style.display = 'flex';
+}
+
+function hideChat() {
+  document.getElementById('chat-panel').style.display = 'none';
+}
+
+function switchChatTab(tab) {
+  chatTab = tab;
+  document.querySelectorAll('.chat-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  renderChatMessages();
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function renderChatMessages() {
+  const box = document.getElementById('chat-messages');
+  box.innerHTML = '';
+  (chatLogs[chatTab] || []).forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'chat-msg' + (m.fromId === socket.id ? ' mine' : '');
+    div.innerHTML = `<span class="chat-from">${escapeHtml(m.from)}:</span> ${escapeHtml(m.text)}`;
+    box.appendChild(div);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+
+function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  let scope = 'all', target;
+  if (chatTab === 'impostor') scope = 'impostor';
+  else if (chatTab.startsWith('dm:')) { scope = 'dm'; target = chatTab.slice(3); }
+  socket.emit('chat_message', { scope, target, text });
+  input.value = '';
+}
+
+document.getElementById('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChatMessage(); });
+
+function openDmFromSelect() {
+  const sel = document.getElementById('dm-target-select');
+  const id = sel.value;
+  if (!id) return;
+  sel.value = '';
+  openDmTab(id, roomPlayers.find(p => p.id === id)?.name || 'Player');
+}
+
+function openDmTab(id, name) {
+  const key = 'dm:' + id;
+  if (!chatLogs[key]) {
+    chatLogs[key] = [];
+    const btn = document.createElement('button');
+    btn.className = 'chat-tab';
+    btn.dataset.tab = key;
+    btn.textContent = name;
+    btn.onclick = () => switchChatTab(key);
+    document.getElementById('chat-tabs').appendChild(btn);
+  }
+  switchChatTab(key);
+}
+
+socket.on('chat_message', (msg) => {
+  let key = 'all';
+  if (msg.scope === 'impostor') key = 'impostor';
+  else if (msg.scope === 'dm') key = 'dm:' + msg.withId;
+
+  if (msg.scope === 'dm' && !chatLogs[key]) {
+    const name = roomPlayers.find(p => p.id === msg.withId)?.name || 'Player';
+    openDmTab(msg.withId, name);
+  }
+
+  if (!chatLogs[key]) chatLogs[key] = [];
+  chatLogs[key].push(msg);
+  if (chatTab === key) renderChatMessages();
+});
+
+socket.on('chat_blocked', ({ reason }) => {
+  const err = document.getElementById('chat-error');
+  err.textContent = reason;
+  setTimeout(() => { err.textContent = ''; }, 3000);
 });
 
 function callVote() {
@@ -220,6 +343,7 @@ socket.on('game_over', ({ winner, reason }) => {
 function continueAfterVote() {
   if (lastVoteWasGameOver) {
     showScreen('screen-landing');
+    hideChat();
   } else {
     showScreen('screen-game');
   }

@@ -24,6 +24,16 @@ function maxImpostors(playerCount) {
   return Math.max(1, Math.floor(playerCount / 2) - 1) || 1;
 }
 
+const BANNED_WORDS = [
+  'fuck', 'shit', 'bitch', 'asshole', 'ass', 'bastard', 'cunt', 'dick',
+  'piss', 'slut', 'whore', 'fag', 'faggot', 'nigger', 'nigga', 'retard'
+];
+const BANNED_REGEX = new RegExp(`\\b(${BANNED_WORDS.join('|')})\\b`, 'i');
+
+function containsProfanity(text) {
+  return BANNED_REGEX.test(text);
+}
+
 // users[usernameLowercase] = { salt, hash, displayName }
 const users = {};
 
@@ -116,7 +126,8 @@ io.on('connection', (socket) => {
       io.to(p.id).emit('game_started', {
         word: isImpostor ? null : room.word,
         isImpostor,
-        fellowImpostors: isImpostor ? room.impostorIds.filter(id => id !== p.id).map(id => room.players.find(pl => pl.id === id)?.name) : []
+        fellowImpostors: isImpostor ? room.impostorIds.filter(id => id !== p.id).map(id => room.players.find(pl => pl.id === id)?.name) : [],
+        players: room.players.map(pl => ({ id: pl.id, name: pl.name }))
       });
     });
   });
@@ -193,6 +204,33 @@ io.on('connection', (socket) => {
     if (correct) {
       room.gameOver = true;
       io.to(code).emit('game_over', { winner: 'impostor', reason: 'An impostor guessed the word.' });
+    }
+  });
+
+  socket.on('chat_message', ({ scope, target, text }) => {
+    const code = socket.data.room;
+    const room = rooms[code];
+    if (!room || !room.started) return;
+    text = (text || '').trim().slice(0, 200);
+    if (!text) return;
+    const sender = room.players.find(p => p.id === socket.id);
+    if (!sender) return;
+
+    if (containsProfanity(text)) {
+      socket.emit('chat_blocked', { reason: 'Your message contains inappropriate language and was not sent.' });
+      return;
+    }
+
+    if (scope === 'all') {
+      io.to(code).emit('chat_message', { scope: 'all', from: sender.name, fromId: socket.id, text });
+    } else if (scope === 'impostor') {
+      if (!room.impostorIds.includes(socket.id) || room.impostorIds.length < 2) return;
+      room.impostorIds.forEach(id => io.to(id).emit('chat_message', { scope: 'impostor', from: sender.name, fromId: socket.id, text }));
+    } else if (scope === 'dm') {
+      const targetPlayer = room.players.find(p => p.id === target);
+      if (!targetPlayer || target === socket.id) return;
+      io.to(socket.id).emit('chat_message', { scope: 'dm', from: sender.name, fromId: socket.id, withId: target, text });
+      io.to(target).emit('chat_message', { scope: 'dm', from: sender.name, fromId: socket.id, withId: socket.id, text });
     }
   });
 
