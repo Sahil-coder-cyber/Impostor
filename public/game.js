@@ -105,7 +105,9 @@ socket.on('room_joined', ({ code }) => {
   document.getElementById('lobby-host-note').textContent = 'Waiting for the host to start...';
 });
 
-socket.on('lobby_update', ({ players, host }) => {
+let currentMaxImpostors = 1;
+
+socket.on('lobby_update', ({ players, host, impostorCount, maxImpostors }) => {
   const ul = document.getElementById('lobby-players');
   ul.innerHTML = '';
   players.forEach(name => {
@@ -119,9 +121,21 @@ socket.on('lobby_update', ({ players, host }) => {
   document.getElementById('btn-start').style.display = isHost ? 'block' : 'none';
   if (!isHost) document.getElementById('lobby-host-note').textContent = 'Waiting for the host to start...';
   else document.getElementById('lobby-host-note').textContent = 'You are the host. Share the code above.';
+
+  currentMaxImpostors = maxImpostors;
+  document.getElementById('impostor-count-value').textContent = impostorCount;
+  document.getElementById('impostor-control-host').style.display = isHost ? 'flex' : 'none';
+  document.getElementById('impostor-count-readonly').style.display = isHost ? 'none' : 'block';
+  document.getElementById('impostor-count-readonly').textContent = `Impostors: ${impostorCount}`;
 });
 
-socket.on('game_started', ({ word, isImpostor }) => {
+function changeImpostorCount(delta) {
+  const current = parseInt(document.getElementById('impostor-count-value').textContent, 10);
+  const next = Math.min(currentMaxImpostors, Math.max(1, current + delta));
+  socket.emit('set_impostor_count', { count: next });
+}
+
+socket.on('game_started', ({ word, isImpostor, fellowImpostors }) => {
   showScreen('screen-game');
   const guessArea = document.getElementById('guess-area');
   document.getElementById('input-guess').value = '';
@@ -130,7 +144,9 @@ socket.on('game_started', ({ word, isImpostor }) => {
   if (isImpostor) {
     document.getElementById('game-role-title').textContent = 'You are the IMPOSTOR';
     document.getElementById('game-word-box').textContent = '???';
-    document.getElementById('game-hint').textContent = 'You have no word. Listen carefully and blend in. Try to guess the word before you get voted out!';
+    document.getElementById('game-hint').textContent = fellowImpostors && fellowImpostors.length
+      ? `You have no word. Your fellow impostor(s): ${fellowImpostors.join(', ')}. Try to guess the word before you get voted out!`
+      : 'You have no word. Listen carefully and blend in. Try to guess the word before you get voted out!';
     guessArea.style.display = 'flex';
   } else {
     document.getElementById('game-role-title').textContent = 'You are a CIVILIAN';

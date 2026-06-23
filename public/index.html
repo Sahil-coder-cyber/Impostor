@@ -60,6 +60,15 @@
     <h2>Waiting Room</h2>
     <div class="code-box">Room Code: <span id="lobby-code"></span></div>
     <ul id="lobby-players" class="player-list"></ul>
+
+    <div id="impostor-control-host" class="impostor-control" style="display:none">
+      <span>Impostors:</span>
+      <button onclick="changeImpostorCount(-1)">-</button>
+      <span id="impostor-count-value">1</span>
+      <button onclick="changeImpostorCount(1)">+</button>
+    </div>
+    <p id="impostor-count-readonly" class="impostor-control" style="display:none"></p>
+
     <p id="lobby-host-note"></p>
     <button id="btn-start" onclick="startGame()" style="display:none">Start Game</button>
     <p class="error" id="err-lobby"></p>

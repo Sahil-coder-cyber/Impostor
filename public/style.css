@@ -111,6 +111,21 @@ input {
 }
 input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0.2); }
 
+.impostor-control {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f21717;
+}
+.impostor-control button {
+  padding: 4px 14px;
+  font-size: 1.2rem;
+  background: linear-gradient(135deg, #f21717, #c1121f);
+}
+#impostor-count-value { min-width: 1.5ch; text-align: center; color: #ffde2a; }
+
 .code-box {
   background: rgba(28, 22, 38, 0.85);
   border: 1.5px solid #ffde2a;

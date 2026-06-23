@@ -17,8 +17,12 @@ const WORD_LIST = [
   'lantern', 'compass', 'hammock', 'parachute', 'telescope', 'waterfall'
 ];
 
-// rooms[code] = { host, players: [{id, name, eliminated}], started, word, impostorId, votingActive, votes, guessUsed, gameOver }
+// rooms[code] = { host, players: [{id, name, eliminated}], started, word, impostorIds, impostorCount, votingActive, votes, guessedIds, gameOver }
 const rooms = {};
+
+function maxImpostors(playerCount) {
+  return Math.max(1, Math.floor(playerCount / 2) - 1) || 1;
+}
 
 // users[usernameLowercase] = { salt, hash, displayName }
 const users = {};
@@ -58,7 +62,7 @@ io.on('connection', (socket) => {
 
   socket.on('create_room', ({ name }) => {
     const code = makeCode();
-    rooms[code] = { host: socket.id, players: [{ id: socket.id, name }], started: false, word: null, impostorId: null };
+    rooms[code] = { host: socket.id, players: [{ id: socket.id, name }], started: false, word: null, impostorIds: [], impostorCount: 1 };
     socket.join(code);
     socket.data.room = code;
     socket.data.name = name;
@@ -79,6 +83,16 @@ io.on('connection', (socket) => {
     io.to(code).emit('lobby_update', lobbyState(code));
   });
 
+  socket.on('set_impostor_count', ({ count }) => {
+    const code = socket.data.room;
+    const room = rooms[code];
+    if (!room || room.host !== socket.id || room.started) return;
+    const max = maxImpostors(room.players.length);
+    count = Math.min(max, Math.max(1, Math.floor(count) || 1));
+    room.impostorCount = count;
+    io.to(code).emit('lobby_update', lobbyState(code));
+  });
+
   socket.on('start_game', () => {
     const code = socket.data.room;
     const room = rooms[code];
@@ -86,18 +100,23 @@ io.on('connection', (socket) => {
     if (room.players.length < 3) return socket.emit('error', 'Need at least 3 players to start.');
     room.started = true;
     room.word = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
-    const impostorIndex = Math.floor(Math.random() * room.players.length);
-    room.impostorId = room.players[impostorIndex].id;
+
+    const count = Math.min(room.impostorCount || 1, maxImpostors(room.players.length));
+    const shuffled = [...room.players].sort(() => Math.random() - 0.5);
+    room.impostorIds = shuffled.slice(0, count).map(p => p.id);
+
     room.players.forEach(p => { p.eliminated = false; });
     room.votingActive = false;
     room.votes = {};
-    room.guessUsed = false;
+    room.guessedIds = [];
     room.gameOver = false;
 
     room.players.forEach(p => {
+      const isImpostor = room.impostorIds.includes(p.id);
       io.to(p.id).emit('game_started', {
-        word: p.id === room.impostorId ? null : room.word,
-        isImpostor: p.id === room.impostorId
+        word: isImpostor ? null : room.word,
+        isImpostor,
+        fellowImpostors: isImpostor ? room.impostorIds.filter(id => id !== p.id).map(id => room.players.find(pl => pl.id === id)?.name) : []
       });
     });
   });
@@ -146,16 +165,17 @@ io.on('connection', (socket) => {
 
     const ejected = room.players.find(p => p.id === winner);
     ejected.eliminated = true;
-    const wasImpostor = ejected.id === room.impostorId;
+    const wasImpostor = room.impostorIds.includes(ejected.id);
     io.to(code).emit('vote_result', { skipped: false, ejectedName: ejected.name, wasImpostor });
 
-    if (wasImpostor) {
+    const aliveImpostorsLeft = room.impostorIds.filter(id => !room.players.find(p => p.id === id).eliminated).length;
+    if (aliveImpostorsLeft === 0) {
       room.gameOver = true;
-      io.to(code).emit('game_over', { winner: 'civilians', reason: 'The impostor was voted out.' });
+      io.to(code).emit('game_over', { winner: 'civilians', reason: 'All impostors were voted out.' });
       return;
     }
 
-    const aliveCiviliansLeft = room.players.filter(p => !p.eliminated && p.id !== room.impostorId).length;
+    const aliveCiviliansLeft = room.players.filter(p => !p.eliminated && !room.impostorIds.includes(p.id)).length;
     if (aliveCiviliansLeft === 0) {
       room.gameOver = true;
       io.to(code).emit('game_over', { winner: 'impostor', reason: 'All civilians have been eliminated.' });
@@ -165,14 +185,14 @@ io.on('connection', (socket) => {
   socket.on('submit_guess', ({ guess }) => {
     const code = socket.data.room;
     const room = rooms[code];
-    if (!room || !room.started || room.gameOver || room.guessUsed) return;
-    if (socket.id !== room.impostorId) return;
-    room.guessUsed = true;
+    if (!room || !room.started || room.gameOver) return;
+    if (!room.impostorIds.includes(socket.id) || room.guessedIds.includes(socket.id)) return;
+    room.guessedIds.push(socket.id);
     const correct = (guess || '').trim().toLowerCase() === room.word.toLowerCase();
     socket.emit('guess_result', { correct });
     if (correct) {
       room.gameOver = true;
-      io.to(code).emit('game_over', { winner: 'impostor', reason: 'The impostor guessed the word.' });
+      io.to(code).emit('game_over', { winner: 'impostor', reason: 'An impostor guessed the word.' });
     }
   });
 
@@ -193,7 +213,14 @@ io.on('connection', (socket) => {
 
 function lobbyState(code) {
   const room = rooms[code];
-  return { players: room.players.map(p => p.name), host: room.players.find(p => p.id === room.host)?.name };
+  const max = maxImpostors(room.players.length);
+  if (room.impostorCount > max) room.impostorCount = max;
+  return {
+    players: room.players.map(p => p.name),
+    host: room.players.find(p => p.id === room.host)?.name,
+    impostorCount: room.impostorCount,
+    maxImpostors: max
+  };
 }
 
 const PORT = process.env.PORT || 3000;
