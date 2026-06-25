@@ -319,15 +319,15 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
   position: fixed;
   top: 76px;
   right: 16px;
-  bottom: 16px;
-  width: 260px;
+  width: 210px;
+  max-height: 320px;
   background: rgba(15, 11, 22, 0.92);
   border: 1.5px solid #3a2f4d;
   border-radius: 12px;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   z-index: 10;
 }
 .game-browser-header {
@@ -343,31 +343,33 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
 .game-browser-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   overflow-y: auto;
   flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: #3a2f4d transparent;
 }
 .game-browser-empty { color: #b9aed1; font-size: 0.85rem; text-align: center; padding-top: 8px; }
 
 .room-entry {
   background: rgba(28, 22, 38, 0.85);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: 7px;
+  padding: 7px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  border-left: 4px solid #3a2f4d;
+  gap: 4px;
+  border-left: 3px solid #3a2f4d;
 }
 .room-entry.lobby { border-left-color: #34d399; }
 .room-entry.in-game { border-left-color: #f21717; }
-.room-entry-code { font-weight: 700; color: #ffde2a; font-size: 0.85rem; }
-.room-entry-info { color: #b9aed1; font-size: 0.78rem; }
+.room-entry-code { font-weight: 700; color: #ffde2a; font-size: 0.78rem; }
+.room-entry-info { color: #b9aed1; font-size: 0.72rem; }
 .room-entry-btn {
-  padding: 6px 12px;
-  font-size: 0.8rem;
+  padding: 4px 10px;
+  font-size: 0.75rem;
   font-weight: 700;
-  border-radius: 6px;
-  letter-spacing: 0.5px;
+  border-radius: 5px;
+  letter-spacing: 0.3px;
   align-self: flex-start;
 }
 .join-btn { background: linear-gradient(135deg, #34d399, #047857); }
