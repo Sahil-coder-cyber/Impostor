@@ -228,7 +228,7 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
 
 .chat-panel {
   position: fixed;
-  top: 76px;
+  top: 100px;
   left: 16px;
   bottom: 16px;
   width: 280px;
@@ -317,7 +317,7 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
 
 .game-browser {
   position: fixed;
-  top: 76px;
+  top: 100px;
   right: 16px;
   width: 210px;
   max-height: 320px;
