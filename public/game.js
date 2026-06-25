@@ -162,19 +162,27 @@ socket.on('game_started', ({ word, isImpostor, fellowImpostors, players }) => {
 
   setupChat(players, isImpostor && fellowImpostors && fellowImpostors.length > 0);
 
-  document.getElementById('clue-list').innerHTML = '';
-  document.getElementById('clue-turn-label').textContent = '';
-  document.getElementById('clue-timer').textContent = '';
-  document.getElementById('clue-input-row').style.display = 'none';
-  document.getElementById('btn-call-vote').style.display = 'none';
-  clearInterval(clueTimerInterval);
+  resetClueUI();
 });
 
 // ---- Clue round ----
 
 let clueTimerInterval = null;
 
+function resetClueUI() {
+  document.getElementById('clue-list').innerHTML = '';
+  document.getElementById('clue-turn-label').textContent = '';
+  document.getElementById('clue-timer').textContent = '';
+  document.getElementById('clue-input-row').style.display = 'none';
+  document.getElementById('btn-call-vote').style.display = 'none';
+  clearInterval(clueTimerInterval);
+}
+
 socket.on('clue_turn', ({ playerId, name, seconds }) => {
+  if (document.getElementById('screen-result').classList.contains('active') && !lastVoteWasGameOver) {
+    resetClueUI();
+    showScreen('screen-game');
+  }
   const isMyTurn = playerId === socket.id;
   document.getElementById('clue-turn-label').textContent = isMyTurn
     ? 'Your turn — type a word related to the secret word!'
@@ -254,6 +262,13 @@ function setupChat(players, hasImpostorChat) {
 
 function hideChat() {
   document.getElementById('chat-panel').style.display = 'none';
+}
+
+function toggleChatMinimize() {
+  const panel = document.getElementById('chat-panel');
+  const btn = panel.querySelector('.chat-minimize-btn');
+  const minimized = panel.classList.toggle('minimized');
+  btn.innerHTML = minimized ? '&#43;' : '&#8722;';
 }
 
 function switchChatTab(tab) {
@@ -403,7 +418,9 @@ function continueAfterVote() {
     hideChat();
     document.getElementById('qr-corner').style.display = 'none';
   } else {
+    resetClueUI();
     showScreen('screen-game');
+    socket.emit('start_next_round');
   }
 }
 

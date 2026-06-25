@@ -118,6 +118,11 @@
 
   <!-- CHAT (persists across game/vote/result screens) -->
   <div id="chat-panel" class="chat-panel" style="display:none">
+    <div class="chat-header">
+      <span class="chat-title">Chat</span>
+      <button class="chat-minimize-btn" onclick="toggleChatMinimize()">&#8722;</button>
+    </div>
+    <div class="chat-body" id="chat-body">
     <div class="chat-tabs" id="chat-tabs">
       <button class="chat-tab active" data-tab="all" onclick="switchChatTab('all')">All</button>
       <button class="chat-tab" data-tab="impostor" id="chat-tab-impostor" style="display:none" onclick="switchChatTab('impostor')">Impostors</button>
@@ -131,6 +136,7 @@
       <button onclick="sendChatMessage()">Send</button>
     </div>
     <p class="error" id="chat-error"></p>
+    </div>
   </div>
 
   <!-- QR CODE (scan to open the game) -->

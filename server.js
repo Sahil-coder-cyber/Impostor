@@ -234,6 +234,7 @@ io.on('connection', (socket) => {
     room.votingActive = false;
 
     if (winner === 'skip' || tied) {
+      room.waitingForNextRound = true;
       io.to(code).emit('vote_result', { skipped: true });
       return;
     }
@@ -254,7 +255,19 @@ io.on('connection', (socket) => {
     if (aliveCiviliansLeft === 0) {
       room.gameOver = true;
       io.to(code).emit('game_over', { winner: 'impostor', reason: 'All civilians have been eliminated.' });
+      return;
     }
+
+    // Game continues — queue next clue round
+    room.waitingForNextRound = true;
+  });
+
+  socket.on('start_next_round', () => {
+    const code = socket.data.room;
+    const room = rooms[code];
+    if (!room || !room.waitingForNextRound) return;
+    room.waitingForNextRound = false;
+    startCluePhase(code);
   });
 
   socket.on('submit_guess', ({ guess }) => {
