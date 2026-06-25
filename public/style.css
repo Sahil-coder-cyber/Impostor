@@ -299,6 +299,69 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
 
 #chat-error { font-size: 0.75rem; }
 
+.game-browser {
+  position: fixed;
+  top: 76px;
+  right: 16px;
+  bottom: 16px;
+  width: 260px;
+  background: rgba(15, 11, 22, 0.92);
+  border: 1.5px solid #3a2f4d;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 10;
+}
+.game-browser-header {
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3a2f4d;
+  flex-shrink: 0;
+}
+.game-browser-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #75dbf4;
+}
+.game-browser-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+.game-browser-empty { color: #b9aed1; font-size: 0.85rem; text-align: center; padding-top: 8px; }
+
+.room-entry {
+  background: rgba(28, 22, 38, 0.85);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-left: 4px solid #3a2f4d;
+}
+.room-entry.lobby { border-left-color: #34d399; }
+.room-entry.in-game { border-left-color: #f21717; }
+.room-entry-code { font-weight: 700; color: #ffde2a; font-size: 0.85rem; }
+.room-entry-info { color: #b9aed1; font-size: 0.78rem; }
+.room-entry-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  align-self: flex-start;
+}
+.join-btn { background: linear-gradient(135deg, #34d399, #047857); }
+.join-btn:hover { background: linear-gradient(135deg, #6ee7b7, #059669); }
+.spectate-btn { background: linear-gradient(135deg, #a855f7, #6d28d9); }
+.spectate-btn:hover { background: linear-gradient(135deg, #c084fc, #7c3aed); }
+
+#spectate-impostors { color: #f21717; font-weight: 700; text-align: center; font-size: 1rem; }
+#spectate-status { color: #b9aed1; font-size: 0.95rem; text-align: center; min-height: 1.2em; }
+
 .qr-corner {
   position: fixed;
   bottom: 16px;

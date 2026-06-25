@@ -139,6 +139,33 @@
     </div>
   </div>
 
+  <!-- GAME BROWSER (right side, visible on landing) -->
+  <div id="game-browser" class="game-browser" style="display:none">
+    <div class="game-browser-header">
+      <span class="game-browser-title">&#127760; Live Games</span>
+    </div>
+    <div id="game-browser-list" class="game-browser-list">
+      <p class="game-browser-empty">No active games.</p>
+    </div>
+    <p class="error" id="game-browser-error"></p>
+  </div>
+
+  <!-- SPECTATE -->
+  <div id="screen-spectate" class="screen">
+    <h2>Spectating</h2>
+    <div class="word-box" id="spectate-word"></div>
+    <p id="spectate-impostors"></p>
+    <div class="clue-area">
+      <div class="clue-status-row">
+        <h3 id="spectate-turn-label"></h3>
+        <span id="spectate-timer" class="clue-timer"></span>
+      </div>
+      <ul id="spectate-clue-list" class="player-list"></ul>
+    </div>
+    <p id="spectate-status"></p>
+    <button onclick="stopSpectating()">Leave Game</button>
+  </div>
+
   <!-- QR CODE (scan to open the game) -->
   <div id="qr-corner" class="qr-corner">
     <img id="qr-code" alt="Scan to play" />

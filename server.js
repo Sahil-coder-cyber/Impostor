@@ -17,7 +17,7 @@ const WORD_LIST = [
   'lantern', 'compass', 'hammock', 'parachute', 'telescope', 'waterfall'
 ];
 
-// rooms[code] = { host, players: [{id, name, eliminated}], started, word, impostorIds, impostorCount, votingActive, votes, guessedIds, gameOver, clueOrder, clueIndex, clues, cluePhaseActive, clueTimeout }
+// rooms[code] = { host, players: [{id, name, eliminated}], started, word, impostorIds, impostorCount, votingActive, votes, guessedIds, gameOver, clueOrder, clueIndex, clues, cluePhaseActive, clueTimeout, waitingForNextRound }
 const rooms = {};
 
 function maxImpostors(playerCount) {
@@ -34,7 +34,7 @@ function containsProfanity(text) {
   return BANNED_REGEX.test(text);
 }
 
-// users[usernameLowercase] = { salt, hash, displayName }
+// users[username] = { salt, hash }
 const users = {};
 
 function hashPassword(password, salt) {
@@ -46,6 +46,20 @@ function makeCode() {
   do { code = String(Math.floor(10000 + Math.random() * 90000)); }
   while (rooms[code]);
   return code;
+}
+
+function publicRoomsList() {
+  return Object.entries(rooms)
+    .filter(([, room]) => !room.gameOver)
+    .map(([code, room]) => ({
+      code,
+      playerCount: room.players.length,
+      started: room.started
+    }));
+}
+
+function broadcastRoomsList() {
+  io.to('lobby_browser').emit('rooms_list', publicRoomsList());
 }
 
 const CLUE_SECONDS = 30;
@@ -96,6 +110,33 @@ function advanceClueTurn(code) {
 
 io.on('connection', (socket) => {
 
+  socket.on('join_lobby_browser', () => {
+    socket.join('lobby_browser');
+    socket.emit('rooms_list', publicRoomsList());
+  });
+
+  socket.on('spectate_room', ({ code }) => {
+    const room = rooms[code];
+    if (!room || !room.started || room.gameOver) {
+      return socket.emit('spectate_error', 'This game is not available to spectate.');
+    }
+    socket.join(code);
+    socket.data.spectating = code;
+    socket.emit('spectate_started', {
+      word: room.word,
+      impostors: room.impostorIds.map(id => room.players.find(p => p.id === id)?.name).filter(Boolean),
+      clues: room.clues || [],
+      players: room.players.filter(p => !p.eliminated).map(p => p.name)
+    });
+  });
+
+  socket.on('leave_spectate', () => {
+    const code = socket.data.spectating;
+    if (!code) return;
+    socket.leave(code);
+    delete socket.data.spectating;
+  });
+
   socket.on('signup', ({ username, password }) => {
     username = (username || '').trim();
     password = password || '';
@@ -124,6 +165,7 @@ io.on('connection', (socket) => {
     socket.data.name = name;
     socket.emit('room_created', { code });
     io.to(code).emit('lobby_update', lobbyState(code));
+    broadcastRoomsList();
   });
 
   socket.on('join_room', ({ name, code }) => {
@@ -137,6 +179,7 @@ io.on('connection', (socket) => {
     socket.data.name = name;
     socket.emit('room_joined', { code });
     io.to(code).emit('lobby_update', lobbyState(code));
+    broadcastRoomsList();
   });
 
   socket.on('set_impostor_count', ({ count }) => {
@@ -178,6 +221,7 @@ io.on('connection', (socket) => {
     });
 
     startCluePhase(code);
+    broadcastRoomsList();
   });
 
   socket.on('submit_clue', ({ word }) => {
@@ -219,7 +263,6 @@ io.on('connection', (socket) => {
     const alive = room.players.filter(p => !p.eliminated);
     if (Object.keys(room.votes).length < alive.length) return;
 
-    // Tally votes
     const tally = {};
     Object.values(room.votes).forEach(t => { tally[t] = (tally[t] || 0) + 1; });
     let winner = 'skip';
@@ -248,6 +291,7 @@ io.on('connection', (socket) => {
     if (aliveImpostorsLeft === 0) {
       room.gameOver = true;
       io.to(code).emit('game_over', { winner: 'civilians', reason: 'All impostors were voted out.' });
+      broadcastRoomsList();
       return;
     }
 
@@ -255,10 +299,10 @@ io.on('connection', (socket) => {
     if (aliveCiviliansLeft === 0) {
       room.gameOver = true;
       io.to(code).emit('game_over', { winner: 'impostor', reason: 'All civilians have been eliminated.' });
+      broadcastRoomsList();
       return;
     }
 
-    // Game continues — queue next clue round
     room.waitingForNextRound = true;
   });
 
@@ -281,6 +325,7 @@ io.on('connection', (socket) => {
     if (correct) {
       room.gameOver = true;
       io.to(code).emit('game_over', { winner: 'impostor', reason: 'An impostor guessed the word.' });
+      broadcastRoomsList();
     }
   });
 
@@ -312,6 +357,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    if (socket.data.spectating) return;
     const code = socket.data.room;
     if (!code || !rooms[code]) return;
     const room = rooms[code];
@@ -320,6 +366,7 @@ io.on('connection', (socket) => {
     if (room.players.length === 0) {
       clearTimeout(room.clueTimeout);
       delete rooms[code];
+      broadcastRoomsList();
       return;
     }
     if (room.host === socket.id) room.host = room.players[0].id;
@@ -330,6 +377,7 @@ io.on('connection', (socket) => {
       room.clueIndex++;
       advanceClueTurn(code);
     }
+    broadcastRoomsList();
   });
 });
 

@@ -12,6 +12,7 @@ function getGuestName() {
   return guest;
 }
 document.getElementById('guest-name').textContent = getGuestName();
+socket.emit('join_lobby_browser');
 
 document.getElementById('qr-code').src =
   `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(window.location.origin)}`;
@@ -19,6 +20,7 @@ document.getElementById('qr-code').src =
 function showScreen(id, context) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  document.getElementById('game-browser').style.display = id === 'screen-landing' ? 'flex' : 'none';
 
   if (id === 'screen-name') {
     mode = context;
@@ -179,6 +181,18 @@ function resetClueUI() {
 }
 
 socket.on('clue_turn', ({ playerId, name, seconds }) => {
+  if (isSpectating) {
+    document.getElementById('spectate-turn-label').textContent = `${name}'s turn...`;
+    clearInterval(clueTimerInterval);
+    let timeLeft = seconds;
+    document.getElementById('spectate-timer').textContent = timeLeft + 's';
+    clueTimerInterval = setInterval(() => {
+      timeLeft--;
+      document.getElementById('spectate-timer').textContent = Math.max(timeLeft, 0) + 's';
+      if (timeLeft <= 0) clearInterval(clueTimerInterval);
+    }, 1000);
+    return;
+  }
   if (document.getElementById('screen-result').classList.contains('active') && !lastVoteWasGameOver) {
     resetClueUI();
     showScreen('screen-game');
@@ -212,11 +226,16 @@ document.getElementById('input-clue').addEventListener('keydown', e => { if (e.k
 socket.on('clue_submitted', ({ name, word }) => {
   const li = document.createElement('li');
   li.textContent = word ? `${name}: ${word}` : `${name}: (no answer)`;
-  document.getElementById('clue-list').appendChild(li);
+  document.getElementById(isSpectating ? 'spectate-clue-list' : 'clue-list').appendChild(li);
 });
 
 socket.on('clue_phase_complete', () => {
   clearInterval(clueTimerInterval);
+  if (isSpectating) {
+    document.getElementById('spectate-turn-label').textContent = 'Clue round done — voting may begin.';
+    document.getElementById('spectate-timer').textContent = '';
+    return;
+  }
   document.getElementById('clue-turn-label').textContent = 'Clue round finished — discuss, then call a vote!';
   document.getElementById('clue-timer').textContent = '';
   document.getElementById('clue-input-row').style.display = 'none';
@@ -370,6 +389,11 @@ function submitGuess() {
 let lastVoteWasGameOver = false;
 
 socket.on('voting_started', ({ players }) => {
+  if (isSpectating) {
+    document.getElementById('spectate-turn-label').textContent = 'Voting in progress...';
+    document.getElementById('spectate-timer').textContent = '';
+    return;
+  }
   showScreen('screen-vote');
   document.getElementById('vote-status').textContent = '';
   const ul = document.getElementById('vote-players');
@@ -386,6 +410,16 @@ socket.on('voting_started', ({ players }) => {
 });
 
 socket.on('vote_result', ({ skipped, ejectedName, wasImpostor }) => {
+  if (isSpectating) {
+    if (skipped) {
+      document.getElementById('spectate-status').textContent = 'Vote skipped — next clue round starting...';
+    } else {
+      document.getElementById('spectate-status').textContent = wasImpostor
+        ? `${ejectedName} was voted out — they WERE the impostor!`
+        : `${ejectedName} was voted out — NOT the impostor. Game continues.`;
+    }
+    return;
+  }
   lastVoteWasGameOver = false;
   showScreen('screen-result');
   if (skipped) {
@@ -405,6 +439,12 @@ socket.on('guess_result', ({ correct }) => {
 });
 
 socket.on('game_over', ({ winner, reason }) => {
+  if (isSpectating) {
+    const status = document.getElementById('spectate-status');
+    status.textContent = (winner === 'civilians' ? 'Civilians Win! ' : 'Impostor Wins! ') + reason;
+    status.style.color = winner === 'civilians' ? '#34d399' : '#f21717';
+    return;
+  }
   lastVoteWasGameOver = true;
   showScreen('screen-result');
   document.getElementById('result-title').textContent = winner === 'civilians' ? 'Civilians Win!' : 'Impostor Wins!';
@@ -428,6 +468,89 @@ socket.on('player_left', ({ name }) => {
   const hint = document.getElementById('game-hint');
   hint.textContent += `\n${name} has left the game.`;
 });
+
+// ---- Game browser ----
+
+socket.on('rooms_list', (roomsList) => {
+  renderGameBrowser(roomsList);
+});
+
+function renderGameBrowser(list) {
+  const el = document.getElementById('game-browser-list');
+  el.innerHTML = '';
+  if (!list || !list.length) {
+    el.innerHTML = '<p class="game-browser-empty">No active games.</p>';
+    return;
+  }
+  list.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'room-entry ' + (r.started ? 'in-game' : 'lobby');
+    const code = document.createElement('span');
+    code.className = 'room-entry-code';
+    code.textContent = 'Room ' + r.code;
+    const info = document.createElement('span');
+    info.className = 'room-entry-info';
+    info.textContent = `${r.playerCount} player${r.playerCount !== 1 ? 's' : ''} · ${r.started ? 'In progress' : 'Waiting to start'}`;
+    const btn = document.createElement('button');
+    if (!r.started) {
+      btn.className = 'room-entry-btn join-btn';
+      btn.textContent = 'Join';
+      btn.onclick = () => quickJoin(r.code);
+    } else {
+      btn.className = 'room-entry-btn spectate-btn';
+      btn.textContent = 'Spectate';
+      btn.onclick = () => spectateRoom(r.code);
+    }
+    div.appendChild(code);
+    div.appendChild(info);
+    div.appendChild(btn);
+    el.appendChild(div);
+  });
+}
+
+function quickJoin(code) {
+  showScreen('screen-name', 'join');
+  document.getElementById('input-code').value = code;
+}
+
+// ---- Spectate ----
+
+let isSpectating = false;
+
+function spectateRoom(code) {
+  socket.emit('spectate_room', { code });
+}
+
+socket.on('spectate_started', ({ word, impostors, clues }) => {
+  isSpectating = true;
+  showScreen('screen-spectate');
+  document.getElementById('spectate-word').textContent = word.toUpperCase();
+  document.getElementById('spectate-impostors').textContent = `Impostors: ${impostors.join(', ')}`;
+  document.getElementById('spectate-status').textContent = '';
+  document.getElementById('spectate-status').style.color = '#b9aed1';
+  document.getElementById('spectate-turn-label').textContent = '';
+  document.getElementById('spectate-timer').textContent = '';
+  const cl = document.getElementById('spectate-clue-list');
+  cl.innerHTML = '';
+  (clues || []).forEach(c => {
+    const li = document.createElement('li');
+    li.textContent = c.word ? `${c.name}: ${c.word}` : `${c.name}: (no answer)`;
+    cl.appendChild(li);
+  });
+});
+
+socket.on('spectate_error', (msg) => {
+  const err = document.getElementById('game-browser-error');
+  err.textContent = msg;
+  setTimeout(() => { err.textContent = ''; }, 3000);
+});
+
+function stopSpectating() {
+  isSpectating = false;
+  socket.emit('leave_spectate');
+  clearInterval(clueTimerInterval);
+  showScreen('screen-landing');
+}
 
 socket.on('signup_success', ({ username }) => {
   localStorage.setItem('guestName', username);
