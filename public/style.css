@@ -317,7 +317,7 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
 
 .game-browser {
   position: fixed;
-  top: 100px;
+  top: 165px;
   right: 16px;
   width: 210px;
   max-height: 320px;
