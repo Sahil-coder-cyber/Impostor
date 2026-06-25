@@ -100,6 +100,7 @@
     <p id="lobby-host-note"></p>
     <button id="btn-start" onclick="startGame()" style="display:none">Start Game</button>
     <p class="error" id="err-lobby"></p>
+    <button class="leave-btn" onclick="leaveGame()">Leave Lobby</button>
   </div>
 
   <!-- GAME -->
@@ -127,6 +128,7 @@
     </div>
 
     <button id="btn-call-vote" onclick="callVote()" style="display:none">Call Vote</button>
+    <button class="leave-btn" onclick="leaveGame()">Leave Game</button>
   </div>
 
   <!-- VOTE -->
@@ -135,6 +137,7 @@
     <ul id="vote-players" class="player-list"></ul>
     <button class="skip-btn" onclick="castVote('skip')">Skip Vote</button>
     <p id="vote-status"></p>
+    <button class="leave-btn" onclick="leaveGame()">Leave Game</button>
   </div>
 
   <!-- RESULT -->
@@ -142,6 +145,7 @@
     <h2 id="result-title"></h2>
     <p id="result-detail"></p>
     <button id="btn-result-continue" onclick="continueAfterVote()">Continue</button>
+    <button class="leave-btn" onclick="leaveGame()">Leave Game</button>
   </div>
 
   <!-- CHAT (persists across game/vote/result screens) -->

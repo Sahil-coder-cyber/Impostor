@@ -588,6 +588,14 @@ function stopSpectating() {
   showScreen('screen-landing');
 }
 
+function leaveGame() {
+  socket.emit('leave_room');
+  hideChat();
+  clearInterval(clueTimerInterval);
+  document.getElementById('qr-corner').style.display = 'none';
+  showScreen('screen-landing');
+}
+
 socket.on('signup_success', ({ username }) => {
   localStorage.setItem('guestName', username);
   document.getElementById('guest-name').textContent = username;

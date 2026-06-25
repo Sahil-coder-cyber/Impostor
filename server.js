@@ -534,6 +534,41 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('leave_room', () => {
+    const code = socket.data.room;
+    if (!code || !rooms[code]) return;
+    const room = rooms[code];
+
+    if (room.isSolo) {
+      clearTimeout(room.clueTimeout);
+      delete rooms[code];
+      socket.leave(code);
+      delete socket.data.room;
+      return;
+    }
+
+    const wasCurrentClueTurn = room.cluePhaseActive && room.clueOrder[room.clueIndex] === socket.id;
+    room.players = room.players.filter(p => p.id !== socket.id);
+    socket.leave(code);
+    delete socket.data.room;
+
+    if (room.players.length === 0) {
+      clearTimeout(room.clueTimeout);
+      delete rooms[code];
+      broadcastRoomsList();
+      return;
+    }
+    if (room.host === socket.id) room.host = room.players[0].id;
+    if (!room.started) io.to(code).emit('lobby_update', lobbyState(code));
+    else io.to(code).emit('player_left', { name: socket.data.name });
+    if (wasCurrentClueTurn) {
+      clearTimeout(room.clueTimeout);
+      room.clueIndex++;
+      advanceClueTurn(code);
+    }
+    broadcastRoomsList();
+  });
+
   socket.on('disconnect', () => {
     if (socket.data.spectating) return;
     const code = socket.data.room;
