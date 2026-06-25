@@ -27,7 +27,7 @@ function showScreen(id, context) {
     document.getElementById('name-heading').textContent = context === 'start' ? 'Start a Game' : 'Join a Game';
     const codeInput = document.getElementById('input-code');
     codeInput.style.display = context === 'join' ? 'block' : 'none';
-    document.getElementById('input-name').value = '';
+    document.getElementById('input-name').value = getGuestName();
     codeInput.value = '';
     document.getElementById('err-name').textContent = '';
   }
@@ -468,6 +468,42 @@ socket.on('player_left', ({ name }) => {
   const hint = document.getElementById('game-hint');
   hint.textContent += `\n${name} has left the game.`;
 });
+
+// ---- Single player ----
+
+let soloDifficulty = 'easy';
+let soloPlayers = 5;
+let soloImpostors = 1;
+
+function setDifficulty(diff) {
+  soloDifficulty = diff;
+  ['easy', 'medium', 'hard'].forEach(d => {
+    document.getElementById('diff-' + d).classList.toggle('active', d === diff);
+  });
+}
+
+function changeSoloSetting(type, delta) {
+  if (type === 'players') {
+    soloPlayers = Math.min(10, Math.max(3, soloPlayers + delta));
+    document.getElementById('solo-player-count').textContent = soloPlayers;
+    const maxImp = Math.max(1, Math.floor(soloPlayers / 2) - 1) || 1;
+    soloImpostors = Math.min(soloImpostors, maxImp);
+    document.getElementById('solo-impostor-count').textContent = soloImpostors;
+  } else {
+    const maxImp = Math.max(1, Math.floor(soloPlayers / 2) - 1) || 1;
+    soloImpostors = Math.min(maxImp, Math.max(1, soloImpostors + delta));
+    document.getElementById('solo-impostor-count').textContent = soloImpostors;
+  }
+}
+
+function startSolo() {
+  socket.emit('start_solo', {
+    name: getGuestName(),
+    difficulty: soloDifficulty,
+    botCount: soloPlayers - 1,
+    impostorCount: soloImpostors
+  });
+}
 
 // ---- Game browser ----
 

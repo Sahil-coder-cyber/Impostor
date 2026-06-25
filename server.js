@@ -17,7 +17,36 @@ const WORD_LIST = [
   'lantern', 'compass', 'hammock', 'parachute', 'telescope', 'waterfall'
 ];
 
-// rooms[code] = { host, players: [{id, name, eliminated}], started, word, impostorIds, impostorCount, votingActive, votes, guessedIds, gameOver, clueOrder, clueIndex, clues, cluePhaseActive, clueTimeout, waitingForNextRound }
+const WORD_HINTS = {
+  apple:      ['fruit','red','tree','juice','sweet','pie','orchard','seed'],
+  guitar:     ['music','strings','instrument','strum','band','rock','tune','chord'],
+  elephant:   ['animal','trunk','large','grey','tusk','safari','heavy','memory'],
+  coffee:     ['drink','hot','beans','caffeine','morning','mug','bitter','espresso'],
+  mountain:   ['tall','peak','climb','snow','rocky','hiking','altitude','summit'],
+  bicycle:    ['wheels','pedal','ride','chain','bike','cycle','transport','handlebar'],
+  umbrella:   ['rain','shelter','cover','weather','open','handle','fold','protection'],
+  diamond:    ['gem','sparkle','shiny','ring','hard','carbon','precious','clear'],
+  volcano:    ['lava','erupt','fire','molten','rock','island','hot','magma'],
+  library:    ['books','read','quiet','shelves','study','knowledge','borrow','catalog'],
+  submarine:  ['underwater','vessel','ocean','deep','torpedo','dive','naval','crew'],
+  rainbow:    ['colors','arch','rain','sky','spectrum','light','prism','bright'],
+  cactus:     ['desert','spiky','dry','plant','sand','green','water','thorns'],
+  penguin:    ['bird','cold','ice','waddle','flippers','tuxedo','arctic','swim'],
+  lighthouse: ['beacon','coast','light','tower','sailor','warning','sea','shore'],
+  astronaut:  ['space','rocket','suit','moon','orbit','nasa','float','stars'],
+  tornado:    ['wind','spin','storm','funnel','weather','twist','destroy','fast'],
+  jellyfish:  ['ocean','sting','tentacles','transparent','float','sea','gel','swim'],
+  lantern:    ['light','glow','flame','dark','carry','candle','warm','night'],
+  compass:    ['direction','north','navigate','needle','map','point','travel','magnetic'],
+  hammock:    ['swing','relax','rest','hang','outdoor','nap','trees','rope'],
+  parachute:  ['fall','sky','jump','float','silk','slow','plane','air'],
+  telescope:  ['stars','see','far','lens','sky','zoom','observe','moon'],
+  waterfall:  ['water','fall','crash','river','mist','cliff','nature','splash']
+};
+
+const BOT_NAMES = ['Aria','Blake','Casey','Dana','Eli','Fern','Gray','Haze','Indra','Juno','Kael','Luma'];
+
+// rooms[code] = { host, players, started, word, impostorIds, impostorCount, votingActive, votes, guessedIds, gameOver, clueOrder, clueIndex, clues, cluePhaseActive, clueTimeout, waitingForNextRound, isSolo, difficulty }
 const rooms = {};
 
 function maxImpostors(playerCount) {
@@ -34,7 +63,6 @@ function containsProfanity(text) {
   return BANNED_REGEX.test(text);
 }
 
-// users[username] = { salt, hash }
 const users = {};
 
 function hashPassword(password, salt) {
@@ -50,10 +78,10 @@ function makeCode() {
 
 function publicRoomsList() {
   return Object.entries(rooms)
-    .filter(([, room]) => !room.gameOver)
+    .filter(([, room]) => !room.gameOver && !room.isSolo)
     .map(([code, room]) => ({
       code,
-      playerCount: room.players.length,
+      playerCount: room.players.filter(p => !p.isBot).length,
       started: room.started
     }));
 }
@@ -61,6 +89,122 @@ function publicRoomsList() {
 function broadcastRoomsList() {
   io.to('lobby_browser').emit('rooms_list', publicRoomsList());
 }
+
+// ---- Bot logic ----
+
+function getBotClue(botId, room) {
+  const hints = (WORD_HINTS[room.word] || []).slice();
+  const diff = room.difficulty || 'medium';
+  const isImpostor = room.impostorIds.includes(botId);
+
+  if (isImpostor) {
+    if (diff === 'hard') {
+      // Look at clues already given and copy one to blend in
+      const prevWords = room.clues.map(c => c.word).filter(Boolean);
+      if (prevWords.length) return prevWords[Math.floor(Math.random() * prevWords.length)];
+    }
+    if (diff !== 'easy') {
+      // Pick from a random word's hints to seem plausible
+      const randWord = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+      const randHints = WORD_HINTS[randWord] || ['interesting'];
+      return randHints[Math.floor(Math.random() * randHints.length)];
+    }
+    const generic = ['thing','stuff','item','object','common','typical','nice','basic'];
+    return generic[Math.floor(Math.random() * generic.length)];
+  }
+
+  if (!hints.length) return 'related';
+  if (diff === 'hard')   return hints[Math.floor(Math.random() * Math.min(3, hints.length))];
+  if (diff === 'medium') return hints[Math.floor(Math.random() * hints.length)];
+  // Easy civilian: sometimes a weak/generic hint
+  if (Math.random() < 0.45) {
+    const generic = ['nice','special','interesting','important','valuable','unique'];
+    return generic[Math.floor(Math.random() * generic.length)];
+  }
+  return hints[hints.length - 1];
+}
+
+function getBotVoteTarget(botId, room) {
+  const diff = room.difficulty || 'medium';
+  const alive = room.players.filter(p => !p.eliminated && p.id !== botId);
+  const isImpostor = room.impostorIds.includes(botId);
+
+  if (isImpostor) {
+    const civilians = alive.filter(p => !room.impostorIds.includes(p.id));
+    return civilians.length ? civilians[Math.floor(Math.random() * civilians.length)].id : 'skip';
+  }
+
+  const accuracy = diff === 'hard' ? 0.80 : diff === 'medium' ? 0.55 : 0.30;
+  if (Math.random() < accuracy) {
+    const hints = (WORD_HINTS[room.word] || []).map(h => h.toLowerCase());
+    // Find a player whose clue wasn't in the hint list
+    const suspects = room.clues.filter(c =>
+      alive.find(p => p.id === c.id) && !hints.includes((c.word || '').toLowerCase())
+    );
+    if (suspects.length) {
+      return suspects[Math.floor(Math.random() * suspects.length)].id;
+    }
+  }
+  return alive.length ? alive[Math.floor(Math.random() * alive.length)].id : 'skip';
+}
+
+// ---- Vote finalization (extracted so bots can trigger it too) ----
+
+function checkVoteComplete(code) {
+  const room = rooms[code];
+  if (!room || !room.votingActive) return;
+  const alive = room.players.filter(p => !p.eliminated);
+  if (Object.keys(room.votes).length < alive.length) return;
+  finalizeVotes(code);
+}
+
+function finalizeVotes(code) {
+  const room = rooms[code];
+  if (!room) return;
+  room.votingActive = false;
+
+  const tally = {};
+  Object.values(room.votes).forEach(t => { tally[t] = (tally[t] || 0) + 1; });
+  let winner = 'skip';
+  let topCount = tally['skip'] || 0;
+  let tied = false;
+  for (const [t, count] of Object.entries(tally)) {
+    if (t === 'skip') continue;
+    if (count > topCount) { winner = t; topCount = count; tied = false; }
+    else if (count === topCount) { tied = true; }
+  }
+
+  if (winner === 'skip' || tied) {
+    room.waitingForNextRound = true;
+    io.to(code).emit('vote_result', { skipped: true });
+    return;
+  }
+
+  const ejected = room.players.find(p => p.id === winner);
+  ejected.eliminated = true;
+  const wasImpostor = room.impostorIds.includes(ejected.id);
+  io.to(code).emit('vote_result', { skipped: false, ejectedName: ejected.name, wasImpostor });
+
+  const aliveImpostorsLeft = room.impostorIds.filter(id => !room.players.find(p => p.id === id).eliminated).length;
+  if (aliveImpostorsLeft === 0) {
+    room.gameOver = true;
+    io.to(code).emit('game_over', { winner: 'civilians', reason: 'All impostors were voted out.' });
+    broadcastRoomsList();
+    return;
+  }
+
+  const aliveCiviliansLeft = room.players.filter(p => !p.eliminated && !room.impostorIds.includes(p.id)).length;
+  if (aliveCiviliansLeft === 0) {
+    room.gameOver = true;
+    io.to(code).emit('game_over', { winner: 'impostor', reason: 'All civilians have been eliminated.' });
+    broadcastRoomsList();
+    return;
+  }
+
+  room.waitingForNextRound = true;
+}
+
+// ---- Clue phase ----
 
 const CLUE_SECONDS = 30;
 
@@ -98,15 +242,30 @@ function advanceClueTurn(code) {
     return advanceClueTurn(code);
   }
 
-  io.to(code).emit('clue_turn', { playerId, name: player.name, seconds: CLUE_SECONDS });
+  io.to(code).emit('clue_turn', { playerId, name: player.name, seconds: player.isBot ? 4 : CLUE_SECONDS });
   clearTimeout(room.clueTimeout);
-  room.clueTimeout = setTimeout(() => {
-    room.clues.push({ id: playerId, name: player.name, word: null });
-    io.to(code).emit('clue_submitted', { name: player.name, word: null });
-    room.clueIndex++;
-    advanceClueTurn(code);
-  }, CLUE_SECONDS * 1000);
+
+  if (player.isBot) {
+    const delay = 2000 + Math.random() * 2000;
+    room.clueTimeout = setTimeout(() => {
+      if (!room.cluePhaseActive || room.clueOrder[room.clueIndex] !== playerId) return;
+      const word = getBotClue(playerId, room);
+      room.clues.push({ id: playerId, name: player.name, word });
+      io.to(code).emit('clue_submitted', { name: player.name, word });
+      room.clueIndex++;
+      advanceClueTurn(code);
+    }, delay);
+  } else {
+    room.clueTimeout = setTimeout(() => {
+      room.clues.push({ id: playerId, name: player.name, word: null });
+      io.to(code).emit('clue_submitted', { name: player.name, word: null });
+      room.clueIndex++;
+      advanceClueTurn(code);
+    }, CLUE_SECONDS * 1000);
+  }
 }
+
+// ---- Socket handlers ----
 
 io.on('connection', (socket) => {
 
@@ -224,6 +383,56 @@ io.on('connection', (socket) => {
     broadcastRoomsList();
   });
 
+  // ---- Single player ----
+
+  socket.on('start_solo', ({ name, difficulty, botCount, impostorCount }) => {
+    difficulty = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
+    botCount = Math.min(9, Math.max(2, Math.floor(botCount) || 4));
+    const playerName = (name || 'You').trim().slice(0, 16) || 'You';
+
+    const shuffledBotNames = [...BOT_NAMES].sort(() => Math.random() - 0.5).slice(0, botCount);
+    const players = [{ id: socket.id, name: playerName, isBot: false }];
+    shuffledBotNames.forEach((bName, i) => {
+      players.push({ id: `bot_${i}_${Date.now()}`, name: bName, isBot: true, eliminated: false });
+    });
+
+    const maxImp = maxImpostors(players.length);
+    const impCount = Math.min(Math.max(1, Math.floor(impostorCount) || 1), maxImp);
+    const word = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+
+    const shuffledForImpostors = [...players].sort(() => Math.random() - 0.5);
+    const impostorIds = shuffledForImpostors.slice(0, impCount).map(p => p.id);
+
+    const code = makeCode();
+    rooms[code] = {
+      host: socket.id, players, started: true, gameOver: false,
+      word, impostorIds, impostorCount: impCount,
+      votingActive: false, votes: {}, guessedIds: [],
+      clueOrder: [], clueIndex: 0, clues: [], cluePhaseActive: false,
+      waitingForNextRound: false, isSolo: true, difficulty
+    };
+
+    socket.join(code);
+    socket.data.room = code;
+    socket.data.name = playerName;
+
+    const isImpostor = impostorIds.includes(socket.id);
+    const fellowImpostors = isImpostor
+      ? impostorIds.filter(id => id !== socket.id).map(id => players.find(p => p.id === id)?.name).filter(Boolean)
+      : [];
+
+    socket.emit('game_started', {
+      word: isImpostor ? null : word,
+      isImpostor,
+      fellowImpostors,
+      players: players.map(p => ({ id: p.id, name: p.name }))
+    });
+
+    startCluePhase(code);
+  });
+
+  // ---- Clue submission ----
+
   socket.on('submit_clue', ({ word }) => {
     const code = socket.data.room;
     const room = rooms[code];
@@ -240,6 +449,8 @@ io.on('connection', (socket) => {
     advanceClueTurn(code);
   });
 
+  // ---- Voting ----
+
   socket.on('call_vote', () => {
     const code = socket.data.room;
     const room = rooms[code];
@@ -250,6 +461,17 @@ io.on('connection', (socket) => {
     room.votes = {};
     const alive = room.players.filter(p => !p.eliminated);
     io.to(code).emit('voting_started', { players: alive.map(p => ({ id: p.id, name: p.name })) });
+
+    if (room.isSolo) {
+      alive.filter(p => p.isBot).forEach(bot => {
+        const delay = 1500 + Math.random() * 2500;
+        setTimeout(() => {
+          if (!room.votingActive || room.votes[bot.id]) return;
+          room.votes[bot.id] = getBotVoteTarget(bot.id, room);
+          checkVoteComplete(code);
+        }, delay);
+      });
+    }
   });
 
   socket.on('cast_vote', ({ target }) => {
@@ -259,51 +481,7 @@ io.on('connection', (socket) => {
     const voter = room.players.find(p => p.id === socket.id);
     if (!voter || voter.eliminated || room.votes[socket.id]) return;
     room.votes[socket.id] = target;
-
-    const alive = room.players.filter(p => !p.eliminated);
-    if (Object.keys(room.votes).length < alive.length) return;
-
-    const tally = {};
-    Object.values(room.votes).forEach(t => { tally[t] = (tally[t] || 0) + 1; });
-    let winner = 'skip';
-    let topCount = tally['skip'] || 0;
-    let tied = false;
-    for (const [t, count] of Object.entries(tally)) {
-      if (t === 'skip') continue;
-      if (count > topCount) { winner = t; topCount = count; tied = false; }
-      else if (count === topCount) { tied = true; }
-    }
-
-    room.votingActive = false;
-
-    if (winner === 'skip' || tied) {
-      room.waitingForNextRound = true;
-      io.to(code).emit('vote_result', { skipped: true });
-      return;
-    }
-
-    const ejected = room.players.find(p => p.id === winner);
-    ejected.eliminated = true;
-    const wasImpostor = room.impostorIds.includes(ejected.id);
-    io.to(code).emit('vote_result', { skipped: false, ejectedName: ejected.name, wasImpostor });
-
-    const aliveImpostorsLeft = room.impostorIds.filter(id => !room.players.find(p => p.id === id).eliminated).length;
-    if (aliveImpostorsLeft === 0) {
-      room.gameOver = true;
-      io.to(code).emit('game_over', { winner: 'civilians', reason: 'All impostors were voted out.' });
-      broadcastRoomsList();
-      return;
-    }
-
-    const aliveCiviliansLeft = room.players.filter(p => !p.eliminated && !room.impostorIds.includes(p.id)).length;
-    if (aliveCiviliansLeft === 0) {
-      room.gameOver = true;
-      io.to(code).emit('game_over', { winner: 'impostor', reason: 'All civilians have been eliminated.' });
-      broadcastRoomsList();
-      return;
-    }
-
-    room.waitingForNextRound = true;
+    checkVoteComplete(code);
   });
 
   socket.on('start_next_round', () => {
@@ -361,6 +539,13 @@ io.on('connection', (socket) => {
     const code = socket.data.room;
     if (!code || !rooms[code]) return;
     const room = rooms[code];
+
+    if (room.isSolo) {
+      clearTimeout(room.clueTimeout);
+      delete rooms[code];
+      return;
+    }
+
     const wasCurrentClueTurn = room.cluePhaseActive && room.clueOrder[room.clueIndex] === socket.id;
     room.players = room.players.filter(p => p.id !== socket.id);
     if (room.players.length === 0) {

@@ -20,9 +20,37 @@
   <div id="screen-landing" class="screen active">
     <h1 class="title">IMPOSTOR</h1>
     <div class="btn-group">
+      <button onclick="showScreen('screen-solo')">Single Player</button>
       <button onclick="showScreen('screen-name', 'start')">Start Game</button>
       <button onclick="showScreen('screen-name', 'join')">Join Game</button>
     </div>
+  </div>
+
+  <!-- SINGLE PLAYER -->
+  <div id="screen-solo" class="screen">
+    <h2>Single Player</h2>
+    <div class="solo-difficulty">
+      <button class="difficulty-btn active" id="diff-easy" onclick="setDifficulty('easy')">Easy</button>
+      <button class="difficulty-btn" id="diff-medium" onclick="setDifficulty('medium')">Medium</button>
+      <button class="difficulty-btn" id="diff-hard" onclick="setDifficulty('hard')">Hard</button>
+    </div>
+    <div class="solo-settings">
+      <div class="solo-setting-row">
+        <span>Players:</span>
+        <button onclick="changeSoloSetting('players', -1)">&#8722;</button>
+        <span id="solo-player-count">5</span>
+        <button onclick="changeSoloSetting('players', 1)">&#43;</button>
+      </div>
+      <div class="solo-setting-row">
+        <span>Impostors:</span>
+        <button onclick="changeSoloSetting('impostors', -1)">&#8722;</button>
+        <span id="solo-impostor-count">1</span>
+        <button onclick="changeSoloSetting('impostors', 1)">&#43;</button>
+      </div>
+    </div>
+    <button onclick="startSolo()">Play</button>
+    <p class="error" id="err-solo"></p>
+    <button class="back-btn" onclick="showScreen('screen-landing')">Back</button>
   </div>
 
   <!-- NAME INPUT -->

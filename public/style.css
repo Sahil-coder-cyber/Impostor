@@ -76,7 +76,7 @@ body {
   100% { background-position: 0% 50%; }
 }
 
-.btn-group { display: flex; gap: 16px; margin-top: 12px; }
+.btn-group { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; justify-content: center; }
 
 button {
   background: linear-gradient(135deg, #f21717, #c1121f);
@@ -93,10 +93,24 @@ button {
 button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4); }
 button:active { transform: translateY(0); }
 
-.btn-group button:nth-child(1) { background: linear-gradient(135deg, #34d399, #047857); }
-.btn-group button:nth-child(1):hover { background: linear-gradient(135deg, #6ee7b7, #059669); }
-.btn-group button:nth-child(2) { background: linear-gradient(135deg, #ffde2a, #f59e0b); color: #1a1a1a; }
-.btn-group button:nth-child(2):hover { background: linear-gradient(135deg, #fde68a, #fbbf24); }
+.btn-group button:nth-child(1) { background: linear-gradient(135deg, #a855f7, #6d28d9); }
+.btn-group button:nth-child(1):hover { background: linear-gradient(135deg, #c084fc, #7c3aed); }
+.btn-group button:nth-child(2) { background: linear-gradient(135deg, #34d399, #047857); }
+.btn-group button:nth-child(2):hover { background: linear-gradient(135deg, #6ee7b7, #059669); }
+.btn-group button:nth-child(3) { background: linear-gradient(135deg, #ffde2a, #f59e0b); color: #1a1a1a; }
+.btn-group button:nth-child(3):hover { background: linear-gradient(135deg, #fde68a, #fbbf24); }
+
+.solo-difficulty { display: flex; gap: 10px; width: 100%; }
+.difficulty-btn { flex: 1; padding: 12px 8px; font-size: 1rem; background: rgba(28,22,38,0.85); border: 1.5px solid #3a2f4d; color: #b9aed1; }
+#diff-easy.active  { background: linear-gradient(135deg, #34d399, #047857); color: #fff; border-color: transparent; }
+#diff-medium.active { background: linear-gradient(135deg, #ffde2a, #f59e0b); color: #1a1a1a; border-color: transparent; }
+#diff-hard.active  { background: linear-gradient(135deg, #f21717, #c1121f); color: #fff; border-color: transparent; }
+
+.solo-settings { width: 100%; display: flex; flex-direction: column; gap: 14px; }
+.solo-setting-row { display: flex; align-items: center; gap: 14px; font-size: 1.1rem; font-weight: 700; color: #75dbf4; }
+.solo-setting-row span:first-child { min-width: 90px; }
+.solo-setting-row span:last-of-type { min-width: 2ch; text-align: center; color: #ffde2a; }
+.solo-setting-row button { padding: 4px 14px; font-size: 1.2rem; background: linear-gradient(135deg, #f21717, #c1121f); }
 
 input {
   width: 100%;
