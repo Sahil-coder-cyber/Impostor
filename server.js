@@ -133,12 +133,19 @@ function endGame(code, winner, reason) {
 
 // ---- Bot logic ----
 
+const ALL_HINT_WORDS = Array.from(new Set(Object.values(WORD_HINTS).flat()));
+const GENERIC_WORDS = [
+  'thing','stuff','item','object','common','typical','nice','basic','special','interesting',
+  'important','valuable','unique','familiar','popular','known','useful','classic','simple','random'
+];
+
+// `used` tracks every word said by anyone (human or bot) for the whole game, not just this round,
+// so bots never repeat a clue someone already gave earlier in the same game.
 function getBotClue(botId, room) {
-  const used = new Set(room.clues.map(c => (c.word || '').toLowerCase()).filter(Boolean));
-  const pick = (arr) => {
-    const avail = arr.filter(w => !used.has(w.toLowerCase()));
-    const pool = avail.length ? avail : arr;
-    return pool[Math.floor(Math.random() * pool.length)];
+  const used = room.usedWords || new Set();
+  const pickFrom = (pool) => {
+    const avail = pool.filter(w => !used.has(w.toLowerCase()));
+    return avail.length ? avail[Math.floor(Math.random() * avail.length)] : null;
   };
 
   const hints = (WORD_HINTS[room.word] || []).slice();
@@ -146,23 +153,32 @@ function getBotClue(botId, room) {
   const isImpostor = room.impostorIds.includes(botId);
 
   if (isImpostor) {
+    // Never fall back to the real word's own hints — that would leak it.
+    const hintsLower = hints.map(h => h.toLowerCase());
+    const safePool = ALL_HINT_WORDS.filter(w => !hintsLower.includes(w.toLowerCase()));
+    let word = null;
     if (diff !== 'easy') {
       const randWord = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
-      const randHints = WORD_HINTS[randWord] || ['interesting'];
-      return pick(randHints);
+      word = pickFrom(WORD_HINTS[randWord] || ['interesting']);
+    } else {
+      word = pickFrom(GENERIC_WORDS);
     }
-    const generic = ['thing','stuff','item','object','common','typical','nice','basic'];
-    return pick(generic);
+    if (!word) word = pickFrom(safePool);
+    if (!word) word = pickFrom(GENERIC_WORDS);
+    return word || `idea${room.clues.length + 1}`;
   }
 
-  if (!hints.length) return 'related';
-  if (diff === 'hard')   return pick(hints.slice(0, Math.min(3, hints.length)));
-  if (diff === 'medium') return pick(hints);
-  if (Math.random() < 0.45) {
-    const generic = ['nice','special','interesting','important','valuable','unique'];
-    return pick(generic);
+  let word = null;
+  if (diff === 'hard')   word = pickFrom(hints.slice(0, Math.min(3, hints.length)));
+  else if (diff === 'medium') word = pickFrom(hints);
+  else {
+    if (Math.random() < 0.45) word = pickFrom(GENERIC_WORDS);
+    if (!word) word = pickFrom([hints[hints.length - 1]]);
   }
-  return pick([hints[hints.length - 1]]);
+  if (!word) word = pickFrom(hints);
+  if (!word) word = pickFrom(ALL_HINT_WORDS);
+  if (!word) word = pickFrom(GENERIC_WORDS);
+  return word || `clue${room.clues.length + 1}`;
 }
 
 function getBotVoteTarget(botId, room) {
@@ -294,6 +310,7 @@ function advanceClueTurn(code) {
       if (!room.cluePhaseActive || room.clueOrder[room.clueIndex] !== playerId) return;
       const word = getBotClue(playerId, room);
       room.clues.push({ id: playerId, name: player.name, word });
+      if (word) (room.usedWords || (room.usedWords = new Set())).add(word.toLowerCase());
       io.to(code).emit('clue_submitted', { name: player.name, word });
       room.clueIndex++;
       advanceClueTurn(code);
@@ -419,6 +436,7 @@ io.on('connection', (socket) => {
     room.votes = {};
     room.guessAttempts = {};
     room.gameOver = false;
+    room.usedWords = new Set();
 
     room.players.forEach(p => {
       const isImpostor = room.impostorIds.includes(p.id);
@@ -451,6 +469,7 @@ io.on('connection', (socket) => {
     room.guessAttempts = {};
     room.gameOver = false;
     room.waitingForNextRound = false;
+    room.usedWords = new Set();
 
     room.players.forEach(p => {
       if (p.isBot) return;
@@ -491,7 +510,7 @@ io.on('connection', (socket) => {
     rooms[code] = {
       host: socket.id, players, started: true, gameOver: false,
       word, impostorIds, impostorCount: impCount,
-      votingActive: false, votes: {}, guessAttempts: {},
+      votingActive: false, votes: {}, guessAttempts: {}, usedWords: new Set(),
       clueOrder: [], clueIndex: 0, clues: [], cluePhaseActive: false,
       waitingForNextRound: false, isSolo: true, difficulty
     };
@@ -528,6 +547,7 @@ io.on('connection', (socket) => {
     if (containsProfanity(word)) word = '';
     const player = room.players.find(p => p.id === socket.id);
     room.clues.push({ id: socket.id, name: player.name, word: word || null });
+    if (word) (room.usedWords || (room.usedWords = new Set())).add(word.toLowerCase());
     io.to(code).emit('clue_submitted', { name: player.name, word: word || null });
     room.clueIndex++;
     advanceClueTurn(code);
