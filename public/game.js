@@ -1,6 +1,7 @@
 const socket = io();
 let mode = 'start'; // 'start' or 'join'
 let myName = '';
+let amIImpostor = false;
 
 // Guest name, CrazyGames-style: "Guest" + random digits, persisted per browser
 function getGuestName() {
@@ -17,10 +18,125 @@ socket.emit('join_lobby_browser');
 document.getElementById('qr-code').src =
   `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(window.location.origin)}`;
 
+function setQrForRoom(code) {
+  const url = `${window.location.origin}/?join=${code}`;
+  document.getElementById('qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(url)}`;
+}
+
+// ---- Avatars (Among Us style) ----
+
+const AVATAR_COLORS = ['#c51111','#132ed1','#117f2d','#ed54ba','#ef7d0d','#f5f557','#3f474e','#d6e0f0','#6b2fbb','#71491e','#38fedc','#50ef39'];
+
+function getAvatarColor() {
+  let c = localStorage.getItem('avatarColor');
+  if (!c || !AVATAR_COLORS.includes(c)) {
+    c = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+    localStorage.setItem('avatarColor', c);
+  }
+  return c;
+}
+
+function setAvatarColor(c) {
+  localStorage.setItem('avatarColor', c);
+  renderAvatarPickers();
+}
+
+function renderAvatarPickers() {
+  const current = getAvatarColor();
+  document.querySelectorAll('.avatar-picker').forEach(container => {
+    container.innerHTML = '';
+    AVATAR_COLORS.forEach(c => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'avatar-swatch' + (c === current ? ' selected' : '');
+      btn.style.background = c;
+      btn.onclick = () => setAvatarColor(c);
+      container.appendChild(btn);
+    });
+  });
+}
+renderAvatarPickers();
+
+function createAvatarEl(color, size) {
+  size = size || 44;
+  const wrap = document.createElement('div');
+  wrap.className = 'avatar';
+  wrap.style.width = size + 'px';
+  wrap.style.height = Math.round(size * 1.2) + 'px';
+  const backpack = document.createElement('div');
+  backpack.className = 'avatar-backpack';
+  backpack.style.background = color;
+  const body = document.createElement('div');
+  body.className = 'avatar-body';
+  body.style.background = color;
+  const visor = document.createElement('div');
+  visor.className = 'avatar-visor';
+  body.appendChild(visor);
+  wrap.appendChild(backpack);
+  wrap.appendChild(body);
+  return wrap;
+}
+
+// ---- Sound effects (Web Audio API, no external assets) ----
+
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function playTone(freq, duration, type, volume) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.value = volume || 0.15;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+    osc.stop(ctx.currentTime + duration);
+  } catch (e) { /* audio unavailable */ }
+}
+function playVoteCast() { playTone(440, 0.12, 'triangle', 0.12); }
+function playEjectSting() {
+  playTone(220, 0.4, 'sawtooth', 0.15);
+  setTimeout(() => playTone(160, 0.5, 'sawtooth', 0.12), 150);
+}
+function playWin() { [523, 659, 784].forEach((f, i) => setTimeout(() => playTone(f, 0.25, 'sine', 0.15), i * 120)); }
+function playLose() { [392, 330, 261].forEach((f, i) => setTimeout(() => playTone(f, 0.3, 'sine', 0.13), i * 150)); }
+
+// ---- Stats ----
+
+function toggleStats() {
+  const panel = document.getElementById('stats-panel');
+  const showing = panel.style.display === 'flex';
+  if (showing) { panel.style.display = 'none'; return; }
+  socket.emit('get_stats', { name: getGuestName() });
+  panel.style.display = 'flex';
+}
+
+socket.on('stats_update', (s) => {
+  s = s || { gamesPlayed: 0, wins: 0, impostorGames: 0, impostorWins: 0, civilianGames: 0, civilianWins: 0 };
+  document.getElementById('stat-games').textContent = s.gamesPlayed;
+  document.getElementById('stat-wins').textContent = s.wins;
+  const winRate = s.gamesPlayed ? Math.round((s.wins / s.gamesPlayed) * 100) : 0;
+  document.getElementById('stat-winrate').textContent = winRate + '%';
+  document.getElementById('stat-impostor-games').textContent = s.impostorGames;
+  const impWinRate = s.impostorGames ? Math.round((s.impostorWins / s.impostorGames) * 100) : 0;
+  document.getElementById('stat-impostor-winrate').textContent = impWinRate + '%';
+});
+
 function showScreen(id, context) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.getElementById('game-browser').style.display = id === 'screen-landing' ? 'flex' : 'none';
+  document.getElementById('stats-panel').style.display = 'none';
 
   if (id === 'screen-name') {
     mode = context;
@@ -30,7 +146,10 @@ function showScreen(id, context) {
     document.getElementById('input-name').value = getGuestName();
     codeInput.value = '';
     document.getElementById('err-name').textContent = '';
+    renderAvatarPickers();
   }
+
+  if (id === 'screen-solo') renderAvatarPickers();
 
   if (id === 'screen-signup') {
     document.getElementById('input-signup-username').value = '';
@@ -75,9 +194,9 @@ function nameGo() {
   err.textContent = '';
 
   if (mode === 'start') {
-    socket.emit('create_room', { name });
+    socket.emit('create_room', { name, color: getAvatarColor() });
   } else {
-    socket.emit('join_room', { name, code });
+    socket.emit('join_room', { name, code, color: getAvatarColor() });
   }
 }
 
@@ -94,6 +213,17 @@ document.getElementById('input-login-username').addEventListener('keydown', e =>
 document.getElementById('input-login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 document.getElementById('input-guess').addEventListener('keydown', e => { if (e.key === 'Enter') submitGuess(); });
 
+// ---- Auto-join from QR code deep link ----
+
+(function autoJoinFromQR() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('join');
+  if (code && /^\d{5}$/.test(code)) {
+    myName = getGuestName();
+    socket.emit('join_room', { name: myName, code, color: getAvatarColor() });
+  }
+})();
+
 // Socket events
 
 socket.on('room_created', ({ code }) => {
@@ -102,6 +232,7 @@ socket.on('room_created', ({ code }) => {
   document.getElementById('btn-start').style.display = 'block';
   document.getElementById('lobby-host-note').textContent = 'You are the host. Share the code above.';
   document.getElementById('qr-corner').style.display = 'flex';
+  setQrForRoom(code);
 });
 
 socket.on('room_joined', ({ code }) => {
@@ -110,20 +241,38 @@ socket.on('room_joined', ({ code }) => {
   document.getElementById('btn-start').style.display = 'none';
   document.getElementById('lobby-host-note').textContent = 'Waiting for the host to start...';
   document.getElementById('qr-corner').style.display = 'flex';
+  setQrForRoom(code);
 });
 
 let currentMaxImpostors = 1;
 
-socket.on('lobby_update', ({ players, host, impostorCount, maxImpostors }) => {
-  const ul = document.getElementById('lobby-players');
-  ul.innerHTML = '';
-  players.forEach(name => {
-    const li = document.createElement('li');
-    if (name === host) li.innerHTML = `<span class="crown">&#9733;</span> ${name} <em style="color:#aaa;font-size:0.8em">(host)</em>`;
-    else li.textContent = name;
-    ul.appendChild(li);
+function renderLobbyCircle(players) {
+  const container = document.getElementById('lobby-circle');
+  container.innerHTML = '';
+  const n = players.length || 1;
+  const radius = n <= 4 ? 85 : n <= 7 ? 105 : 125;
+  const cx = container.clientWidth ? container.clientWidth / 2 : 160;
+  const cy = container.clientHeight ? container.clientHeight / 2 : 130;
+  players.forEach((p, i) => {
+    const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+    const x = cx + radius * Math.cos(angle);
+    const y = cy + radius * Math.sin(angle);
+    const seat = document.createElement('div');
+    seat.className = 'lobby-seat';
+    seat.style.left = x + 'px';
+    seat.style.top = y + 'px';
+    seat.appendChild(createAvatarEl(p.color || '#888', 44));
+    const label = document.createElement('div');
+    label.className = 'lobby-seat-name';
+    label.innerHTML = (p.isHost ? '<span class="crown">&#9733;</span>' : '') + escapeHtml(p.name);
+    seat.appendChild(label);
+    container.appendChild(seat);
   });
-  // Update start button visibility (host may change on disconnect)
+}
+
+socket.on('lobby_update', ({ players, host, impostorCount, maxImpostors }) => {
+  renderLobbyCircle(players);
+
   const isHost = host === myName;
   document.getElementById('btn-start').style.display = isHost ? 'block' : 'none';
   if (!isHost) document.getElementById('lobby-host-note').textContent = 'Waiting for the host to start...';
@@ -143,11 +292,13 @@ function changeImpostorCount(delta) {
 }
 
 socket.on('game_started', ({ word, isImpostor, fellowImpostors, players }) => {
+  amIImpostor = isImpostor;
   showScreen('screen-game');
   const guessArea = document.getElementById('guess-area');
   document.getElementById('input-guess').value = '';
   document.getElementById('input-guess').disabled = false;
   document.getElementById('guess-status').textContent = '';
+  document.getElementById('btn-play-again').style.display = 'none';
 
   if (isImpostor) {
     document.getElementById('game-role-title').textContent = 'You are the IMPOSTOR';
@@ -377,6 +528,7 @@ function callVote() {
 
 function castVote(target) {
   socket.emit('cast_vote', { target });
+  playVoteCast();
   document.getElementById('vote-status').textContent = 'Vote submitted. Waiting for others...';
   document.querySelectorAll('.vote-target, .skip-btn').forEach(btn => btn.disabled = true);
 }
@@ -410,27 +562,43 @@ socket.on('voting_started', ({ players }) => {
   });
 });
 
-socket.on('vote_result', ({ skipped, ejectedName, wasImpostor }) => {
+socket.on('vote_result', ({ skipped, ejectedName, ejectedColor, wasImpostor, impostorsRemaining }) => {
   if (isSpectating) {
     if (skipped) {
       document.getElementById('spectate-status').textContent = 'Vote skipped — next clue round starting...';
     } else {
       document.getElementById('spectate-status').textContent = wasImpostor
-        ? `${ejectedName} was voted out — they WERE the impostor!`
-        : `${ejectedName} was voted out — NOT the impostor. Game continues.`;
+        ? `${ejectedName} was voted out — they WERE the impostor! (${impostorsRemaining} remaining)`
+        : `${ejectedName} was voted out — NOT the impostor. Game continues. (${impostorsRemaining} remaining)`;
     }
     return;
   }
   lastVoteWasGameOver = false;
   showScreen('screen-result');
+  document.getElementById('btn-play-again').style.display = 'none';
+
+  const stage = document.getElementById('eject-stage');
+  const wrap = document.getElementById('eject-avatar-wrap');
+  wrap.innerHTML = '';
+
   if (skipped) {
+    stage.style.display = 'none';
     document.getElementById('result-title').textContent = 'Vote Skipped';
     document.getElementById('result-detail').textContent = 'No one was voted out. Back to discussion.';
+    document.getElementById('impostors-remaining').textContent = `Impostors remaining: ${impostorsRemaining}`;
   } else {
+    stage.style.display = 'block';
+    wrap.appendChild(createAvatarEl(ejectedColor || '#888', 60));
+    wrap.classList.remove('ejecting');
+    void wrap.offsetWidth;
+    wrap.classList.add('ejecting');
+    playEjectSting();
+
     document.getElementById('result-title').textContent = `${ejectedName} was voted out`;
     document.getElementById('result-detail').textContent = wasImpostor
       ? `${ejectedName} was the IMPOSTOR!`
       : `${ejectedName} was NOT the impostor.`;
+    document.getElementById('impostors-remaining').textContent = `Impostors remaining: ${impostorsRemaining}`;
   }
   document.getElementById('btn-result-continue').textContent = 'Continue';
 });
@@ -457,10 +625,20 @@ socket.on('game_over', ({ winner, reason }) => {
   }
   lastVoteWasGameOver = true;
   showScreen('screen-result');
+  document.getElementById('eject-stage').style.display = 'none';
+  document.getElementById('impostors-remaining').textContent = '';
   document.getElementById('result-title').textContent = winner === 'civilians' ? 'Civilians Win!' : 'Impostor Wins!';
   document.getElementById('result-detail').textContent = reason;
   document.getElementById('btn-result-continue').textContent = 'Back to Home';
+  document.getElementById('btn-play-again').style.display = 'inline-block';
+
+  const onWinningTeam = (winner === 'impostor' && amIImpostor) || (winner === 'civilians' && !amIImpostor);
+  if (onWinningTeam) playWin(); else playLose();
 });
+
+function playAgain() {
+  socket.emit('play_again');
+}
 
 function continueAfterVote() {
   if (lastVoteWasGameOver) {
@@ -509,6 +687,7 @@ function changeSoloSetting(type, delta) {
 function startSolo() {
   socket.emit('start_solo', {
     name: getGuestName(),
+    color: getAvatarColor(),
     difficulty: soloDifficulty,
     botCount: soloPlayers - 1,
     impostorCount: soloImpostors

@@ -9,12 +9,22 @@
 <body>
 
   <header class="top-bar">
-    <span id="guest-name" class="guest-name"></span>
+    <span id="guest-name" class="guest-name" onclick="toggleStats()"></span>
     <div class="top-bar-right">
       <button class="signin-btn" onclick="showScreen('screen-signup')">Sign In</button>
       <button class="signin-btn" onclick="showScreen('screen-login')">Login</button>
     </div>
   </header>
+
+  <!-- STATS PANEL -->
+  <div id="stats-panel" class="stats-panel" style="display:none">
+    <h3>Your Stats</h3>
+    <div class="stats-row"><span>Games Played</span><span id="stat-games">0</span></div>
+    <div class="stats-row"><span>Wins</span><span id="stat-wins">0</span></div>
+    <div class="stats-row"><span>Win Rate</span><span id="stat-winrate">0%</span></div>
+    <div class="stats-row"><span>Impostor Games</span><span id="stat-impostor-games">0</span></div>
+    <div class="stats-row"><span>Impostor Win Rate</span><span id="stat-impostor-winrate">0%</span></div>
+  </div>
 
   <!-- LANDING -->
   <div id="screen-landing" class="screen active">
@@ -48,6 +58,7 @@
         <button onclick="changeSoloSetting('impostors', 1)">&#43;</button>
       </div>
     </div>
+    <div class="avatar-picker"></div>
     <button onclick="startSolo()">Play</button>
     <p class="error" id="err-solo"></p>
     <button class="back-btn" onclick="showScreen('screen-landing')">Back</button>
@@ -58,6 +69,7 @@
     <h2 id="name-heading"></h2>
     <input id="input-name" type="text" placeholder="Your name" maxlength="16" />
     <input id="input-code" type="text" placeholder="5-digit room code" maxlength="5" style="display:none" />
+    <div class="avatar-picker"></div>
     <button id="btn-name-go" onclick="nameGo()">Continue</button>
     <p class="error" id="err-name"></p>
     <button class="back-btn" onclick="showScreen('screen-landing')">Back</button>
@@ -87,7 +99,7 @@
   <div id="screen-lobby" class="screen">
     <h2>Waiting Room</h2>
     <div class="code-box">Room Code: <span id="lobby-code"></span></div>
-    <ul id="lobby-players" class="player-list"></ul>
+    <div id="lobby-circle" class="lobby-circle"></div>
 
     <div id="impostor-control-host" class="impostor-control" style="display:none">
       <span>Impostors:</span>
@@ -142,9 +154,14 @@
 
   <!-- RESULT -->
   <div id="screen-result" class="screen">
+    <div id="eject-stage" class="eject-stage" style="display:none">
+      <div id="eject-avatar-wrap" class="eject-avatar-wrap"></div>
+    </div>
     <h2 id="result-title"></h2>
     <p id="result-detail"></p>
+    <p id="impostors-remaining"></p>
     <button id="btn-result-continue" onclick="continueAfterVote()">Continue</button>
+    <button id="btn-play-again" onclick="playAgain()" style="display:none">Play Again</button>
     <button class="leave-btn" onclick="leaveGame()">Leave Game</button>
   </div>
 

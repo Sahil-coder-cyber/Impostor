@@ -46,8 +46,20 @@ const WORD_HINTS = {
 
 const BOT_NAMES = ['Aria','Blake','Casey','Dana','Eli','Fern','Gray','Haze','Indra','Juno','Kael','Luma'];
 
-// rooms[code] = { host, players, started, word, impostorIds, impostorCount, votingActive, votes, guessedIds, gameOver, clueOrder, clueIndex, clues, cluePhaseActive, clueTimeout, waitingForNextRound, isSolo, difficulty }
+const AVATAR_COLORS = ['#c51111','#132ed1','#117f2d','#ed54ba','#ef7d0d','#f5f557','#3f474e','#d6e0f0','#6b2fbb','#71491e','#38fedc','#50ef39'];
+function randomColor() {
+  return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+}
+
+// rooms[code] = { host, players, started, word, impostorIds, impostorCount, votingActive, votes, guessAttempts, gameOver, clueOrder, clueIndex, clues, cluePhaseActive, clueTimeout, waitingForNextRound, isSolo, difficulty }
 const rooms = {};
+
+// stats[name] = { gamesPlayed, wins, impostorGames, impostorWins, civilianGames, civilianWins }
+const stats = {};
+
+function emptyStats() {
+  return { gamesPlayed: 0, wins: 0, impostorGames: 0, impostorWins: 0, civilianGames: 0, civilianWins: 0 };
+}
 
 function maxImpostors(playerCount) {
   return Math.max(1, Math.floor(playerCount / 2) - 1) || 1;
@@ -90,6 +102,35 @@ function broadcastRoomsList() {
   io.to('lobby_browser').emit('rooms_list', publicRoomsList());
 }
 
+// ---- Stats / game end ----
+
+function recordGameResult(room, winner) {
+  room.players.forEach(p => {
+    if (p.isBot) return;
+    if (!stats[p.name]) stats[p.name] = emptyStats();
+    const s = stats[p.name];
+    const wasImpostor = room.impostorIds.includes(p.id);
+    s.gamesPlayed++;
+    if (wasImpostor) {
+      s.impostorGames++;
+      if (winner === 'impostor') { s.wins++; s.impostorWins++; }
+    } else {
+      s.civilianGames++;
+      if (winner === 'civilians') { s.wins++; s.civilianWins++; }
+    }
+    io.to(p.id).emit('stats_update', s);
+  });
+}
+
+function endGame(code, winner, reason) {
+  const room = rooms[code];
+  if (!room) return;
+  room.gameOver = true;
+  io.to(code).emit('game_over', { winner, reason });
+  recordGameResult(room, winner);
+  broadcastRoomsList();
+}
+
 // ---- Bot logic ----
 
 function getBotClue(botId, room) {
@@ -106,7 +147,6 @@ function getBotClue(botId, room) {
 
   if (isImpostor) {
     if (diff !== 'easy') {
-      // Pick from a random word's hints to seem plausible
       const randWord = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
       const randHints = WORD_HINTS[randWord] || ['interesting'];
       return pick(randHints);
@@ -118,7 +158,6 @@ function getBotClue(botId, room) {
   if (!hints.length) return 'related';
   if (diff === 'hard')   return pick(hints.slice(0, Math.min(3, hints.length)));
   if (diff === 'medium') return pick(hints);
-  // Easy civilian: sometimes a weak/generic hint
   if (Math.random() < 0.45) {
     const generic = ['nice','special','interesting','important','valuable','unique'];
     return pick(generic);
@@ -139,7 +178,6 @@ function getBotVoteTarget(botId, room) {
   const accuracy = diff === 'hard' ? 0.80 : diff === 'medium' ? 0.55 : 0.30;
   if (Math.random() < accuracy) {
     const hints = (WORD_HINTS[room.word] || []).map(h => h.toLowerCase());
-    // Find a player whose clue wasn't in the hint list
     const suspects = room.clues.filter(c =>
       alive.find(p => p.id === c.id) && !hints.includes((c.word || '').toLowerCase())
     );
@@ -150,7 +188,7 @@ function getBotVoteTarget(botId, room) {
   return alive.length ? alive[Math.floor(Math.random() * alive.length)].id : 'skip';
 }
 
-// ---- Vote finalization (extracted so bots can trigger it too) ----
+// ---- Vote finalization ----
 
 function checkVoteComplete(code) {
   const room = rooms[code];
@@ -176,30 +214,33 @@ function finalizeVotes(code) {
     else if (count === topCount) { tied = true; }
   }
 
+  const impostorsRemainingNow = () => room.impostorIds.filter(id => {
+    const p = room.players.find(pl => pl.id === id);
+    return p && !p.eliminated;
+  }).length;
+
   if (winner === 'skip' || tied) {
     room.waitingForNextRound = true;
-    io.to(code).emit('vote_result', { skipped: true });
+    io.to(code).emit('vote_result', { skipped: true, impostorsRemaining: impostorsRemainingNow() });
     return;
   }
 
   const ejected = room.players.find(p => p.id === winner);
   ejected.eliminated = true;
   const wasImpostor = room.impostorIds.includes(ejected.id);
-  io.to(code).emit('vote_result', { skipped: false, ejectedName: ejected.name, wasImpostor });
+  const remaining = impostorsRemainingNow();
+  io.to(code).emit('vote_result', {
+    skipped: false, ejectedName: ejected.name, ejectedColor: ejected.color, wasImpostor, impostorsRemaining: remaining
+  });
 
-  const aliveImpostorsLeft = room.impostorIds.filter(id => !room.players.find(p => p.id === id).eliminated).length;
-  if (aliveImpostorsLeft === 0) {
-    room.gameOver = true;
-    io.to(code).emit('game_over', { winner: 'civilians', reason: 'All impostors were voted out.' });
-    broadcastRoomsList();
+  if (remaining === 0) {
+    endGame(code, 'civilians', 'All impostors were voted out.');
     return;
   }
 
   const aliveCiviliansLeft = room.players.filter(p => !p.eliminated && !room.impostorIds.includes(p.id)).length;
   if (aliveCiviliansLeft === 0) {
-    room.gameOver = true;
-    io.to(code).emit('game_over', { winner: 'impostor', reason: 'All civilians have been eliminated.' });
-    broadcastRoomsList();
+    endGame(code, 'impostor', 'All civilians have been eliminated.');
     return;
   }
 
@@ -276,6 +317,10 @@ io.on('connection', (socket) => {
     socket.emit('rooms_list', publicRoomsList());
   });
 
+  socket.on('get_stats', ({ name }) => {
+    socket.emit('stats_update', stats[name] || emptyStats());
+  });
+
   socket.on('spectate_room', ({ code }) => {
     const room = rooms[code];
     if (!room || !room.started || room.gameOver) {
@@ -318,9 +363,13 @@ io.on('connection', (socket) => {
     socket.emit('login_success', { username });
   });
 
-  socket.on('create_room', ({ name }) => {
+  socket.on('create_room', ({ name, color }) => {
     const code = makeCode();
-    rooms[code] = { host: socket.id, players: [{ id: socket.id, name }], started: false, word: null, impostorIds: [], impostorCount: 1 };
+    rooms[code] = {
+      host: socket.id,
+      players: [{ id: socket.id, name, color: color || randomColor() }],
+      started: false, word: null, impostorIds: [], impostorCount: 1
+    };
     socket.join(code);
     socket.data.room = code;
     socket.data.name = name;
@@ -329,12 +378,12 @@ io.on('connection', (socket) => {
     broadcastRoomsList();
   });
 
-  socket.on('join_room', ({ name, code }) => {
+  socket.on('join_room', ({ name, code, color }) => {
     const room = rooms[code];
     if (!room) return socket.emit('error', 'Room not found.');
     if (room.started) return socket.emit('error', 'Game already started.');
     if (room.players.find(p => p.name === name)) return socket.emit('error', 'Name already taken in this room.');
-    room.players.push({ id: socket.id, name });
+    room.players.push({ id: socket.id, name, color: color || randomColor() });
     socket.join(code);
     socket.data.room = code;
     socket.data.name = name;
@@ -385,17 +434,50 @@ io.on('connection', (socket) => {
     broadcastRoomsList();
   });
 
+  socket.on('play_again', () => {
+    const code = socket.data.room;
+    const room = rooms[code];
+    if (!room || !room.gameOver) return;
+    if (!room.isSolo && room.host !== socket.id) return;
+
+    room.word = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+    const count = Math.min(room.impostorCount || 1, maxImpostors(room.players.length));
+    const shuffled = [...room.players].sort(() => Math.random() - 0.5);
+    room.impostorIds = shuffled.slice(0, count).map(p => p.id);
+
+    room.players.forEach(p => { p.eliminated = false; });
+    room.votingActive = false;
+    room.votes = {};
+    room.guessAttempts = {};
+    room.gameOver = false;
+    room.waitingForNextRound = false;
+
+    room.players.forEach(p => {
+      if (p.isBot) return;
+      const isImpostor = room.impostorIds.includes(p.id);
+      io.to(p.id).emit('game_started', {
+        word: isImpostor ? null : room.word,
+        isImpostor,
+        fellowImpostors: isImpostor ? room.impostorIds.filter(id => id !== p.id).map(id => room.players.find(pl => pl.id === id)?.name) : [],
+        players: room.players.map(pl => ({ id: pl.id, name: pl.name }))
+      });
+    });
+
+    startCluePhase(code);
+    if (!room.isSolo) broadcastRoomsList();
+  });
+
   // ---- Single player ----
 
-  socket.on('start_solo', ({ name, difficulty, botCount, impostorCount }) => {
+  socket.on('start_solo', ({ name, color, difficulty, botCount, impostorCount }) => {
     difficulty = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
     botCount = Math.min(9, Math.max(2, Math.floor(botCount) || 4));
     const playerName = (name || 'You').trim().slice(0, 16) || 'You';
 
     const shuffledBotNames = [...BOT_NAMES].sort(() => Math.random() - 0.5).slice(0, botCount);
-    const players = [{ id: socket.id, name: playerName, isBot: false }];
+    const players = [{ id: socket.id, name: playerName, color: color || randomColor(), isBot: false }];
     shuffledBotNames.forEach((bName, i) => {
-      players.push({ id: `bot_${i}_${Date.now()}`, name: bName, isBot: true, eliminated: false });
+      players.push({ id: `bot_${i}_${Date.now()}`, name: bName, color: randomColor(), isBot: true, eliminated: false });
     });
 
     const maxImp = maxImpostors(players.length);
@@ -509,9 +591,7 @@ io.on('connection', (socket) => {
     const correct = (guess || '').trim().toLowerCase() === room.word.toLowerCase();
     socket.emit('guess_result', { correct, attemptsLeft });
     if (correct) {
-      room.gameOver = true;
-      io.to(code).emit('game_over', { winner: 'impostor', reason: 'An impostor guessed the word.' });
-      broadcastRoomsList();
+      endGame(code, 'impostor', 'An impostor guessed the word.');
     }
   });
 
@@ -614,7 +694,7 @@ function lobbyState(code) {
   const max = maxImpostors(room.players.length);
   if (room.impostorCount > max) room.impostorCount = max;
   return {
-    players: room.players.map(p => p.name),
+    players: room.players.map(p => ({ name: p.name, color: p.color, isHost: p.id === room.host })),
     host: room.players.find(p => p.id === room.host)?.name,
     impostorCount: room.impostorCount,
     maxImpostors: max
