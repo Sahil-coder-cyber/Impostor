@@ -93,35 +93,37 @@ function broadcastRoomsList() {
 // ---- Bot logic ----
 
 function getBotClue(botId, room) {
+  const used = new Set(room.clues.map(c => (c.word || '').toLowerCase()).filter(Boolean));
+  const pick = (arr) => {
+    const avail = arr.filter(w => !used.has(w.toLowerCase()));
+    const pool = avail.length ? avail : arr;
+    return pool[Math.floor(Math.random() * pool.length)];
+  };
+
   const hints = (WORD_HINTS[room.word] || []).slice();
   const diff = room.difficulty || 'medium';
   const isImpostor = room.impostorIds.includes(botId);
 
   if (isImpostor) {
-    if (diff === 'hard') {
-      // Look at clues already given and copy one to blend in
-      const prevWords = room.clues.map(c => c.word).filter(Boolean);
-      if (prevWords.length) return prevWords[Math.floor(Math.random() * prevWords.length)];
-    }
     if (diff !== 'easy') {
       // Pick from a random word's hints to seem plausible
       const randWord = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
       const randHints = WORD_HINTS[randWord] || ['interesting'];
-      return randHints[Math.floor(Math.random() * randHints.length)];
+      return pick(randHints);
     }
     const generic = ['thing','stuff','item','object','common','typical','nice','basic'];
-    return generic[Math.floor(Math.random() * generic.length)];
+    return pick(generic);
   }
 
   if (!hints.length) return 'related';
-  if (diff === 'hard')   return hints[Math.floor(Math.random() * Math.min(3, hints.length))];
-  if (diff === 'medium') return hints[Math.floor(Math.random() * hints.length)];
+  if (diff === 'hard')   return pick(hints.slice(0, Math.min(3, hints.length)));
+  if (diff === 'medium') return pick(hints);
   // Easy civilian: sometimes a weak/generic hint
   if (Math.random() < 0.45) {
     const generic = ['nice','special','interesting','important','valuable','unique'];
-    return generic[Math.floor(Math.random() * generic.length)];
+    return pick(generic);
   }
-  return hints[hints.length - 1];
+  return pick([hints[hints.length - 1]]);
 }
 
 function getBotVoteTarget(botId, room) {
@@ -366,7 +368,7 @@ io.on('connection', (socket) => {
     room.players.forEach(p => { p.eliminated = false; });
     room.votingActive = false;
     room.votes = {};
-    room.guessedIds = [];
+    room.guessAttempts = {};
     room.gameOver = false;
 
     room.players.forEach(p => {
@@ -407,7 +409,7 @@ io.on('connection', (socket) => {
     rooms[code] = {
       host: socket.id, players, started: true, gameOver: false,
       word, impostorIds, impostorCount: impCount,
-      votingActive: false, votes: {}, guessedIds: [],
+      votingActive: false, votes: {}, guessAttempts: {},
       clueOrder: [], clueIndex: 0, clues: [], cluePhaseActive: false,
       waitingForNextRound: false, isSolo: true, difficulty
     };
@@ -492,14 +494,20 @@ io.on('connection', (socket) => {
     startCluePhase(code);
   });
 
+  const MAX_GUESSES = 3;
+
   socket.on('submit_guess', ({ guess }) => {
     const code = socket.data.room;
     const room = rooms[code];
     if (!room || !room.started || room.gameOver) return;
-    if (!room.impostorIds.includes(socket.id) || room.guessedIds.includes(socket.id)) return;
-    room.guessedIds.push(socket.id);
+    if (!room.impostorIds.includes(socket.id)) return;
+    room.guessAttempts = room.guessAttempts || {};
+    const attempts = room.guessAttempts[socket.id] || 0;
+    if (attempts >= MAX_GUESSES) return;
+    room.guessAttempts[socket.id] = attempts + 1;
+    const attemptsLeft = MAX_GUESSES - room.guessAttempts[socket.id];
     const correct = (guess || '').trim().toLowerCase() === room.word.toLowerCase();
-    socket.emit('guess_result', { correct });
+    socket.emit('guess_result', { correct, attemptsLeft });
     if (correct) {
       room.gameOver = true;
       io.to(code).emit('game_over', { winner: 'impostor', reason: 'An impostor guessed the word.' });

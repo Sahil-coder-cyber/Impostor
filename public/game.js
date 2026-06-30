@@ -146,6 +146,7 @@ socket.on('game_started', ({ word, isImpostor, fellowImpostors, players }) => {
   showScreen('screen-game');
   const guessArea = document.getElementById('guess-area');
   document.getElementById('input-guess').value = '';
+  document.getElementById('input-guess').disabled = false;
   document.getElementById('guess-status').textContent = '';
 
   if (isImpostor) {
@@ -434,8 +435,17 @@ socket.on('vote_result', ({ skipped, ejectedName, wasImpostor }) => {
   document.getElementById('btn-result-continue').textContent = 'Continue';
 });
 
-socket.on('guess_result', ({ correct }) => {
-  document.getElementById('guess-status').textContent = correct ? 'Correct!' : 'Wrong guess. You cannot guess again.';
+socket.on('guess_result', ({ correct, attemptsLeft }) => {
+  if (correct) {
+    document.getElementById('guess-status').textContent = 'Correct!';
+    document.getElementById('input-guess').disabled = true;
+  } else if (attemptsLeft > 0) {
+    document.getElementById('guess-status').textContent = `Wrong guess. ${attemptsLeft} guess${attemptsLeft === 1 ? '' : 'es'} left.`;
+    document.getElementById('input-guess').value = '';
+  } else {
+    document.getElementById('guess-status').textContent = 'Wrong guess. No guesses left.';
+    document.getElementById('input-guess').disabled = true;
+  }
 });
 
 socket.on('game_over', ({ winner, reason }) => {
