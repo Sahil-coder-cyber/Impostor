@@ -42,14 +42,23 @@ body {
 
 .stats-panel {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px 5px;
-  font-size: 0.72rem;
+  flex-direction: column;
+  gap: 5px;
+  background: rgba(15, 11, 22, 0.88);
+  border: 1.5px solid #3a2f4d;
+  border-radius: 10px;
+  padding: 10px 14px;
+  min-width: 210px;
+  margin-top: 4px;
 }
-.stat-chip { color: #b9aed1; }
-.stat-chip span { color: #ffde2a; font-weight: 700; }
-.stat-sep { color: #4b4458; }
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 0.84rem;
+  color: #b9aed1;
+}
+.stats-row span:last-child { color: #ffde2a; font-weight: 700; }
 
 /* ---- Host extras (category / custom word) ---- */
 
