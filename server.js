@@ -73,8 +73,8 @@ function pickWord(room) {
 }
 
 const AVATAR_COLORS = ['#c51111','#132ed1','#117f2d','#ed54ba','#ef7d0d','#f5f557','#3f474e','#d6e0f0','#6b2fbb','#71491e','#38fedc','#50ef39'];
-function slotColor(index) {
-  return AVATAR_COLORS[index % AVATAR_COLORS.length];
+function randomColor() {
+  return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 }
 
 // rooms[code] = { host, players, started, word, impostorIds, impostorCount, votingActive, votes, guessAttempts, gameOver, clueOrder, clueIndex, clues, cluePhaseActive, clueTimeout, waitingForNextRound, isSolo, difficulty }
@@ -468,7 +468,7 @@ io.on('connection', (socket) => {
     const code = makeCode();
     rooms[code] = {
       host: socket.id,
-      players: [{ id: socket.id, name, color: slotColor(0) }],
+      players: [{ id: socket.id, name, color: randomColor() }],
       started: false, word: null, impostorIds: [], impostorCount: 1,
       category: '', customWord: ''
     };
@@ -485,7 +485,7 @@ io.on('connection', (socket) => {
     if (!room) return socket.emit('error', 'Room not found.');
     if (room.started) return socket.emit('error', 'Game already started.');
     if (room.players.find(p => p.name === name)) return socket.emit('error', 'Name already taken in this room.');
-    room.players.push({ id: socket.id, name, color: slotColor(room.players.length) });
+    room.players.push({ id: socket.id, name, color: randomColor() });
     socket.join(code);
     socket.data.room = code;
     socket.data.name = name;
@@ -603,9 +603,9 @@ io.on('connection', (socket) => {
     const playerName = (name || 'You').trim().slice(0, 16) || 'You';
 
     const shuffledBotNames = [...BOT_NAMES].sort(() => Math.random() - 0.5).slice(0, botCount);
-    const players = [{ id: socket.id, name: playerName, color: slotColor(0), isBot: false }];
+    const players = [{ id: socket.id, name: playerName, color: randomColor(), isBot: false }];
     shuffledBotNames.forEach((bName, i) => {
-      players.push({ id: `bot_${i}_${Date.now()}`, name: bName, color: slotColor(i + 1), isBot: true, eliminated: false });
+      players.push({ id: `bot_${i}_${Date.now()}`, name: bName, color: randomColor(), isBot: true, eliminated: false });
     });
 
     const maxImp = maxImpostors(players.length);
