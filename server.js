@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 
 const app = express();
@@ -9,6 +10,17 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/api/stats', (_req, res) => {
+  res.json({
+    totalGamesPlayed,
+    totalAccounts: Object.keys(users).length,
+    topPlayers: Object.entries(stats)
+      .sort(([, a], [, b]) => b.wins - a.wins)
+      .slice(0, 10)
+      .map(([name, s]) => ({ name, ...s }))
+  });
+});
 
 const WORD_LIST = [
   'apple', 'guitar', 'elephant', 'coffee', 'mountain', 'bicycle',
@@ -77,6 +89,32 @@ function containsProfanity(text) {
 
 const users = {};
 
+// ---- Persistence ----
+
+const DATA_DIR = path.join(__dirname, 'data');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const STATS_FILE = path.join(DATA_DIR, 'stats.json');
+let totalGamesPlayed = 0;
+
+function saveData() {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users), 'utf8');
+    fs.writeFileSync(STATS_FILE, JSON.stringify({ stats, totalGamesPlayed }), 'utf8');
+  } catch (e) { console.error('Failed to save data:', e.message); }
+}
+
+try {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (fs.existsSync(USERS_FILE)) Object.assign(users, JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')));
+  if (fs.existsSync(STATS_FILE)) {
+    const saved = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
+    if (saved.stats) Object.assign(stats, saved.stats);
+    if (saved.totalGamesPlayed) totalGamesPlayed = saved.totalGamesPlayed;
+  }
+  console.log(`Loaded: ${Object.keys(users).length} accounts, ${totalGamesPlayed} total games played`);
+} catch (e) { console.error('Failed to load persisted data:', e.message); }
+
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
@@ -120,12 +158,14 @@ function recordGameResult(room, winner) {
     }
     io.to(p.id).emit('stats_update', s);
   });
+  saveData();
 }
 
 function endGame(code, winner, reason) {
   const room = rooms[code];
   if (!room) return;
   room.gameOver = true;
+  if (!room.isSolo) totalGamesPlayed++;
   io.to(code).emit('game_over', { winner, reason });
   recordGameResult(room, winner);
   broadcastRoomsList();
@@ -367,6 +407,7 @@ io.on('connection', (socket) => {
     if (users[username]) return socket.emit('signup_error', 'Username already taken.');
     const salt = crypto.randomBytes(16).toString('hex');
     users[username] = { salt, hash: hashPassword(password, salt) };
+    saveData();
     socket.emit('signup_success', { username });
   });
 
