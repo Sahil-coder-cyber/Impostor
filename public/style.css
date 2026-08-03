@@ -26,35 +26,30 @@ body {
   right: 0;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 16px 24px;
+  align-items: flex-start;
+  padding: 12px 24px;
 }
+
+.top-bar-left { display: flex; flex-direction: column; gap: 4px; }
 
 .guest-name {
   font-weight: 700;
   color: #75dbf4;
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   letter-spacing: 0.5px;
   text-shadow: 0 0 12px rgba(117, 219, 244, 0.5);
-  cursor: pointer;
 }
 
 .stats-panel {
-  position: fixed;
-  top: 60px;
-  left: 16px;
-  background: rgba(15, 11, 22, 0.96);
-  border: 1.5px solid #3a2f4d;
-  border-radius: 12px;
-  padding: 14px 18px;
-  flex-direction: column;
-  gap: 6px;
-  z-index: 30;
-  min-width: 230px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 5px;
+  font-size: 0.72rem;
 }
-.stats-panel h3 { color: #75dbf4; font-size: 1rem; margin-bottom: 6px; }
-.stats-row { display: flex; justify-content: space-between; font-size: 0.85rem; color: #b9aed1; gap: 16px; }
-.stats-row span:last-child { color: #ffde2a; font-weight: 700; }
+.stat-chip { color: #b9aed1; }
+.stat-chip span { color: #ffde2a; font-weight: 700; }
+.stat-sep { color: #4b4458; }
 
 /* ---- Avatars (Among Us style) ---- */
 

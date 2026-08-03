@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { MongoClient } = require('mongodb');
 
 const app = express();
 const server = http.createServer(app);
@@ -95,25 +96,51 @@ const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const STATS_FILE = path.join(DATA_DIR, 'stats.json');
 let totalGamesPlayed = 0;
+let db = null;
 
 function saveData() {
+  // File backup (always, fire-and-forget errors)
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.writeFileSync(USERS_FILE, JSON.stringify(users), 'utf8');
     fs.writeFileSync(STATS_FILE, JSON.stringify({ stats, totalGamesPlayed }), 'utf8');
-  } catch (e) { console.error('Failed to save data:', e.message); }
+  } catch (e) { console.error('File save failed:', e.message); }
+  // MongoDB (fire-and-forget)
+  if (db) {
+    const uops = Object.entries(users).map(([name, u]) => ({
+      updateOne: { filter: { _id: name }, update: { $set: u }, upsert: true }
+    }));
+    if (uops.length) db.collection('users').bulkWrite(uops).catch(console.error);
+    const sops = Object.entries(stats).map(([name, s]) => ({
+      updateOne: { filter: { _id: name }, update: { $set: s }, upsert: true }
+    }));
+    if (sops.length) db.collection('stats').bulkWrite(sops).catch(console.error);
+    db.collection('meta').updateOne({ _id: 'global' }, { $set: { totalGamesPlayed } }, { upsert: true }).catch(console.error);
+  }
 }
 
-try {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (fs.existsSync(USERS_FILE)) Object.assign(users, JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')));
-  if (fs.existsSync(STATS_FILE)) {
-    const saved = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
-    if (saved.stats) Object.assign(stats, saved.stats);
-    if (saved.totalGamesPlayed) totalGamesPlayed = saved.totalGamesPlayed;
+async function connectDB() {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) { console.log('No MONGODB_URI set — using file storage'); return; }
+  try {
+    const client = new MongoClient(uri);
+    await client.connect();
+    db = client.db('impostor');
+    for (const u of await db.collection('users').find({}).toArray()) {
+      users[u._id] = { salt: u.salt, hash: u.hash };
+    }
+    for (const s of await db.collection('stats').find({}).toArray()) {
+      const { _id, ...rest } = s;
+      stats[_id] = rest;
+    }
+    const meta = await db.collection('meta').findOne({ _id: 'global' });
+    if (meta && meta.totalGamesPlayed) totalGamesPlayed = meta.totalGamesPlayed;
+    console.log(`MongoDB: ${Object.keys(users).length} accounts, ${totalGamesPlayed} total games`);
+  } catch (e) {
+    console.error('MongoDB connection failed, falling back to files:', e.message);
+    db = null;
   }
-  console.log(`Loaded: ${Object.keys(users).length} accounts, ${totalGamesPlayed} total games played`);
-} catch (e) { console.error('Failed to load persisted data:', e.message); }
+}
 
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
@@ -763,4 +790,21 @@ function lobbyState(code) {
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Impostor server running on port ${PORT}`));
+async function start() {
+  await connectDB();
+  if (!db) {
+    // Fall back to file storage if no MongoDB
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      if (fs.existsSync(USERS_FILE)) Object.assign(users, JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')));
+      if (fs.existsSync(STATS_FILE)) {
+        const saved = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
+        if (saved.stats) Object.assign(stats, saved.stats);
+        if (saved.totalGamesPlayed) totalGamesPlayed = saved.totalGamesPlayed;
+      }
+      console.log(`File storage: ${Object.keys(users).length} accounts, ${totalGamesPlayed} total games`);
+    } catch (e) { console.error('Failed to load file data:', e.message); }
+  }
+  server.listen(PORT, () => console.log(`Impostor server on port ${PORT}`));
+}
+start();

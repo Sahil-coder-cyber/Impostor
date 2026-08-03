@@ -9,22 +9,25 @@
 <body>
 
   <header class="top-bar">
-    <span id="guest-name" class="guest-name" onclick="toggleStats()"></span>
+    <div class="top-bar-left">
+      <span id="guest-name" class="guest-name"></span>
+      <div id="stats-panel" class="stats-panel" style="display:none">
+        <span class="stat-chip"><span id="stat-games">0</span> games</span>
+        <span class="stat-sep">·</span>
+        <span class="stat-chip"><span id="stat-wins">0</span> wins</span>
+        <span class="stat-sep">·</span>
+        <span class="stat-chip"><span id="stat-winrate">0%</span> wr</span>
+        <span class="stat-sep">·</span>
+        <span class="stat-chip"><span id="stat-impostor-games">0</span> imp</span>
+        <span class="stat-sep">·</span>
+        <span class="stat-chip"><span id="stat-impostor-winrate">0%</span> imp wr</span>
+      </div>
+    </div>
     <div class="top-bar-right">
       <button class="signin-btn" onclick="showScreen('screen-signup')">Sign In</button>
       <button class="signin-btn" onclick="showScreen('screen-login')">Login</button>
     </div>
   </header>
-
-  <!-- STATS PANEL -->
-  <div id="stats-panel" class="stats-panel" style="display:none">
-    <h3>Your Stats</h3>
-    <div class="stats-row"><span>Games Played</span><span id="stat-games">0</span></div>
-    <div class="stats-row"><span>Wins</span><span id="stat-wins">0</span></div>
-    <div class="stats-row"><span>Win Rate</span><span id="stat-winrate">0%</span></div>
-    <div class="stats-row"><span>Impostor Games</span><span id="stat-impostor-games">0</span></div>
-    <div class="stats-row"><span>Impostor Win Rate</span><span id="stat-impostor-winrate">0%</span></div>
-  </div>
 
   <!-- LANDING -->
   <div id="screen-landing" class="screen active">

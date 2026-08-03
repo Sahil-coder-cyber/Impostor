@@ -113,13 +113,14 @@ function playLose() { [392, 330, 261].forEach((f, i) => setTimeout(() => playTon
 
 // ---- Stats ----
 
-function toggleStats() {
-  const panel = document.getElementById('stats-panel');
-  const showing = panel.style.display === 'flex';
-  if (showing) { panel.style.display = 'none'; return; }
+let accountLoggedIn = localStorage.getItem('isAccount') === 'true';
+
+function showStatsPanel() {
+  document.getElementById('stats-panel').style.display = 'flex';
   socket.emit('get_stats', { name: getGuestName() });
-  panel.style.display = 'flex';
 }
+
+if (accountLoggedIn) showStatsPanel();
 
 socket.on('stats_update', (s) => {
   s = s || { gamesPlayed: 0, wins: 0, impostorGames: 0, impostorWins: 0, civilianGames: 0, civilianWins: 0 };
@@ -130,13 +131,14 @@ socket.on('stats_update', (s) => {
   document.getElementById('stat-impostor-games').textContent = s.impostorGames;
   const impWinRate = s.impostorGames ? Math.round((s.impostorWins / s.impostorGames) * 100) : 0;
   document.getElementById('stat-impostor-winrate').textContent = impWinRate + '%';
+  if (accountLoggedIn) document.getElementById('stats-panel').style.display = 'flex';
 });
 
 function showScreen(id, context) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.getElementById('game-browser').style.display = id === 'screen-landing' ? 'flex' : 'none';
-  document.getElementById('stats-panel').style.display = 'none';
+  if (!accountLoggedIn) document.getElementById('stats-panel').style.display = 'none';
 
   if (id === 'screen-name') {
     mode = context;
@@ -787,8 +789,11 @@ function leaveGame() {
 
 socket.on('signup_success', ({ username }) => {
   localStorage.setItem('guestName', username);
+  localStorage.setItem('isAccount', 'true');
+  accountLoggedIn = true;
   document.getElementById('guest-name').textContent = username;
   showScreen('screen-landing');
+  showStatsPanel();
 });
 
 socket.on('signup_error', (msg) => {
@@ -797,8 +802,11 @@ socket.on('signup_error', (msg) => {
 
 socket.on('login_success', ({ username }) => {
   localStorage.setItem('guestName', username);
+  localStorage.setItem('isAccount', 'true');
+  accountLoggedIn = true;
   document.getElementById('guest-name').textContent = username;
   showScreen('screen-landing');
+  showStatsPanel();
 });
 
 socket.on('login_error', (msg) => {
