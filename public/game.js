@@ -27,35 +27,6 @@ function setQrForRoom(code) {
 
 const AVATAR_COLORS = ['#c51111','#132ed1','#117f2d','#ed54ba','#ef7d0d','#f5f557','#3f474e','#d6e0f0','#6b2fbb','#71491e','#38fedc','#50ef39'];
 
-function getAvatarColor() {
-  let c = localStorage.getItem('avatarColor');
-  if (!c || !AVATAR_COLORS.includes(c)) {
-    c = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
-    localStorage.setItem('avatarColor', c);
-  }
-  return c;
-}
-
-function setAvatarColor(c) {
-  localStorage.setItem('avatarColor', c);
-  renderAvatarPickers();
-}
-
-function renderAvatarPickers() {
-  const current = getAvatarColor();
-  document.querySelectorAll('.avatar-picker').forEach(container => {
-    container.innerHTML = '';
-    AVATAR_COLORS.forEach(c => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'avatar-swatch' + (c === current ? ' selected' : '');
-      btn.style.background = c;
-      btn.onclick = () => setAvatarColor(c);
-      container.appendChild(btn);
-    });
-  });
-}
-renderAvatarPickers();
 
 function createAvatarEl(color, size) {
   size = size || 44;
@@ -131,6 +102,8 @@ socket.on('stats_update', (s) => {
   document.getElementById('stat-impostor-games').textContent = s.impostorGames;
   const impWinRate = s.impostorGames ? Math.round((s.impostorWins / s.impostorGames) * 100) : 0;
   document.getElementById('stat-impostor-winrate').textContent = impWinRate + '%';
+  document.getElementById('stat-streak').textContent = s.currentStreak || 0;
+  document.getElementById('stat-best-streak').textContent = s.bestStreak || 0;
   if (accountLoggedIn) document.getElementById('stats-panel').style.display = 'flex';
 });
 
@@ -148,10 +121,9 @@ function showScreen(id, context) {
     document.getElementById('input-name').value = getGuestName();
     codeInput.value = '';
     document.getElementById('err-name').textContent = '';
-    renderAvatarPickers();
   }
 
-  if (id === 'screen-solo') renderAvatarPickers();
+  if (id === 'screen-leaderboard') showLeaderboard();
 
   if (id === 'screen-signup') {
     document.getElementById('input-signup-username').value = '';
@@ -196,9 +168,9 @@ function nameGo() {
   err.textContent = '';
 
   if (mode === 'start') {
-    socket.emit('create_room', { name, color: getAvatarColor() });
+    socket.emit('create_room', { name });
   } else {
-    socket.emit('join_room', { name, code, color: getAvatarColor() });
+    socket.emit('join_room', { name, code });
   }
 }
 
@@ -222,7 +194,7 @@ document.getElementById('input-guess').addEventListener('keydown', e => { if (e.
   const code = params.get('join');
   if (code && /^\d{5}$/.test(code)) {
     myName = getGuestName();
-    socket.emit('join_room', { name: myName, code, color: getAvatarColor() });
+    socket.emit('join_room', { name: myName, code });
   }
 })();
 
@@ -285,7 +257,18 @@ socket.on('lobby_update', ({ players, host, impostorCount, maxImpostors }) => {
   document.getElementById('impostor-control-host').style.display = isHost ? 'flex' : 'none';
   document.getElementById('impostor-count-readonly').style.display = isHost ? 'none' : 'block';
   document.getElementById('impostor-count-readonly').textContent = `Impostors: ${impostorCount}`;
+  document.getElementById('host-extras').style.display = isHost ? 'flex' : 'none';
 });
+
+function setCategory(val) {
+  socket.emit('set_category', { category: val });
+  document.getElementById('input-custom-word').value = '';
+}
+
+function setCustomWord(val) {
+  socket.emit('set_custom_word', { word: val });
+  if (val) document.getElementById('category-select').value = '';
+}
 
 function changeImpostorCount(delta) {
   const current = parseInt(document.getElementById('impostor-count-value').textContent, 10);
@@ -377,11 +360,58 @@ function submitClue() {
 
 document.getElementById('input-clue').addEventListener('keydown', e => { if (e.key === 'Enter') submitClue(); });
 
-socket.on('clue_submitted', ({ name, word }) => {
+socket.on('clue_submitted', ({ name, word, clueIndex }) => {
   const li = document.createElement('li');
-  li.textContent = word ? `${name}: ${word}` : `${name}: (no answer)`;
+  li.dataset.clueIndex = clueIndex;
+  const text = document.createElement('span');
+  text.textContent = word ? `${name}: ${word}` : `${name}: (no answer)`;
+  li.appendChild(text);
+  if (!isSpectating && word) {
+    const reacts = document.createElement('span');
+    reacts.className = 'clue-react-row';
+    ['😂','🤔','😮'].forEach(emoji => {
+      const btn = document.createElement('button');
+      btn.className = 'react-btn';
+      btn.textContent = emoji;
+      btn.onclick = () => socket.emit('react_clue', { clueIndex, emoji });
+      reacts.appendChild(btn);
+    });
+    li.appendChild(reacts);
+  }
   document.getElementById(isSpectating ? 'spectate-clue-list' : 'clue-list').appendChild(li);
 });
+
+socket.on('clue_reaction', ({ playerName, clueIndex, emoji }) => {
+  const li = document.querySelector(`#clue-list li[data-clue-index="${clueIndex}"]`);
+  if (!li) return;
+  const pop = document.createElement('span');
+  pop.className = 'react-pop';
+  pop.textContent = `${playerName}: ${emoji}`;
+  li.appendChild(pop);
+  setTimeout(() => pop.remove(), 2000);
+});
+
+function showLeaderboard() {
+  fetch('/api/stats').then(r => r.json()).then(data => {
+    const list = document.getElementById('leaderboard-list');
+    if (!data.topPlayers || !data.topPlayers.length) {
+      list.innerHTML = '<p style="color:#b9aed1">No games played yet.</p>';
+      return;
+    }
+    list.innerHTML = `<p class="lb-total">Total games played: <strong>${data.totalGamesPlayed}</strong></p>` +
+      data.topPlayers.map((p, i) => {
+        const wr = p.gamesPlayed ? Math.round((p.wins / p.gamesPlayed) * 100) : 0;
+        return `<div class="lb-row">
+          <span class="lb-rank">#${i + 1}</span>
+          <span class="lb-name">${p.name}</span>
+          <span class="lb-stat">${p.wins}W / ${p.gamesPlayed}G</span>
+          <span class="lb-wr">${wr}%</span>
+        </div>`;
+      }).join('');
+  }).catch(() => {
+    document.getElementById('leaderboard-list').innerHTML = '<p style="color:#f87171">Could not load leaderboard.</p>';
+  });
+}
 
 socket.on('clue_phase_complete', () => {
   clearInterval(clueTimerInterval);
@@ -597,10 +627,19 @@ socket.on('vote_result', ({ skipped, ejectedName, ejectedColor, wasImpostor, imp
     playEjectSting();
 
     document.getElementById('result-title').textContent = `${ejectedName} was voted out`;
-    document.getElementById('result-detail').textContent = wasImpostor
-      ? `${ejectedName} was the IMPOSTOR!`
-      : `${ejectedName} was NOT the impostor.`;
-    document.getElementById('impostors-remaining').textContent = `Impostors remaining: ${impostorsRemaining}`;
+    document.getElementById('result-detail').textContent = '...';
+    document.getElementById('impostors-remaining').textContent = '';
+    document.getElementById('btn-result-continue').style.display = 'none';
+
+    setTimeout(() => {
+      document.getElementById('result-detail').textContent = wasImpostor
+        ? `${ejectedName} was the IMPOSTOR!`
+        : `${ejectedName} was NOT the impostor.`;
+      document.getElementById('impostors-remaining').textContent = `Impostors remaining: ${impostorsRemaining}`;
+      document.getElementById('btn-result-continue').style.display = '';
+      document.getElementById('btn-result-continue').textContent = 'Continue';
+    }, 2500);
+    return;
   }
   document.getElementById('btn-result-continue').textContent = 'Continue';
 });
@@ -689,7 +728,6 @@ function changeSoloSetting(type, delta) {
 function startSolo() {
   socket.emit('start_solo', {
     name: getGuestName(),
-    color: getAvatarColor(),
     difficulty: soloDifficulty,
     botCount: soloPlayers - 1,
     impostorCount: soloImpostors

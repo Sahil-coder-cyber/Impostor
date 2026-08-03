@@ -59,6 +59,19 @@ const WORD_HINTS = {
 
 const BOT_NAMES = ['Aria','Blake','Casey','Dana','Eli','Fern','Gray','Haze','Indra','Juno','Kael','Luma'];
 
+const WORD_CATEGORIES = {
+  nature:  ['mountain', 'volcano', 'rainbow', 'cactus', 'waterfall', 'tornado'],
+  animals: ['elephant', 'penguin', 'jellyfish'],
+  objects: ['guitar', 'bicycle', 'umbrella', 'diamond', 'lantern', 'compass', 'hammock', 'parachute', 'telescope', 'submarine'],
+  misc:    ['apple', 'coffee', 'library', 'astronaut', 'lighthouse'],
+};
+
+function pickWord(room) {
+  if (room.customWord) return room.customWord;
+  const pool = (room.category && WORD_CATEGORIES[room.category]) || WORD_LIST;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 const AVATAR_COLORS = ['#c51111','#132ed1','#117f2d','#ed54ba','#ef7d0d','#f5f557','#3f474e','#d6e0f0','#6b2fbb','#71491e','#38fedc','#50ef39'];
 function randomColor() {
   return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
@@ -71,7 +84,7 @@ const rooms = {};
 const stats = {};
 
 function emptyStats() {
-  return { gamesPlayed: 0, wins: 0, impostorGames: 0, impostorWins: 0, civilianGames: 0, civilianWins: 0 };
+  return { gamesPlayed: 0, wins: 0, impostorGames: 0, impostorWins: 0, civilianGames: 0, civilianWins: 0, currentStreak: 0, bestStreak: 0 };
 }
 
 function maxImpostors(playerCount) {
@@ -176,13 +189,16 @@ function recordGameResult(room, winner) {
     const s = stats[p.name];
     const wasImpostor = room.impostorIds.includes(p.id);
     s.gamesPlayed++;
-    if (wasImpostor) {
-      s.impostorGames++;
-      if (winner === 'impostor') { s.wins++; s.impostorWins++; }
+    const won = wasImpostor ? winner === 'impostor' : winner === 'civilians';
+    if (won) {
+      s.wins++;
+      s.currentStreak = (s.currentStreak || 0) + 1;
+      s.bestStreak = Math.max(s.bestStreak || 0, s.currentStreak);
     } else {
-      s.civilianGames++;
-      if (winner === 'civilians') { s.wins++; s.civilianWins++; }
+      s.currentStreak = 0;
     }
+    if (wasImpostor) { s.impostorGames++; if (won) s.impostorWins++; }
+    else { s.civilianGames++; if (won) s.civilianWins++; }
     io.to(p.id).emit('stats_update', s);
   });
   saveData();
@@ -378,14 +394,14 @@ function advanceClueTurn(code) {
       const word = getBotClue(playerId, room);
       room.clues.push({ id: playerId, name: player.name, word });
       if (word) (room.usedWords || (room.usedWords = new Set())).add(word.toLowerCase());
-      io.to(code).emit('clue_submitted', { name: player.name, word });
+      io.to(code).emit('clue_submitted', { name: player.name, word, clueIndex: room.clues.length - 1 });
       room.clueIndex++;
       advanceClueTurn(code);
     }, delay);
   } else {
     room.clueTimeout = setTimeout(() => {
       room.clues.push({ id: playerId, name: player.name, word: null });
-      io.to(code).emit('clue_submitted', { name: player.name, word: null });
+      io.to(code).emit('clue_submitted', { name: player.name, word: null, clueIndex: room.clues.length - 1 });
       room.clueIndex++;
       advanceClueTurn(code);
     }, CLUE_SECONDS * 1000);
@@ -448,12 +464,13 @@ io.on('connection', (socket) => {
     socket.emit('login_success', { username });
   });
 
-  socket.on('create_room', ({ name, color }) => {
+  socket.on('create_room', ({ name }) => {
     const code = makeCode();
     rooms[code] = {
       host: socket.id,
-      players: [{ id: socket.id, name, color: color || randomColor() }],
-      started: false, word: null, impostorIds: [], impostorCount: 1
+      players: [{ id: socket.id, name, color: randomColor() }],
+      started: false, word: null, impostorIds: [], impostorCount: 1,
+      category: '', customWord: ''
     };
     socket.join(code);
     socket.data.room = code;
@@ -463,12 +480,12 @@ io.on('connection', (socket) => {
     broadcastRoomsList();
   });
 
-  socket.on('join_room', ({ name, code, color }) => {
+  socket.on('join_room', ({ name, code }) => {
     const room = rooms[code];
     if (!room) return socket.emit('error', 'Room not found.');
     if (room.started) return socket.emit('error', 'Game already started.');
     if (room.players.find(p => p.name === name)) return socket.emit('error', 'Name already taken in this room.');
-    room.players.push({ id: socket.id, name, color: color || randomColor() });
+    room.players.push({ id: socket.id, name, color: randomColor() });
     socket.join(code);
     socket.data.room = code;
     socket.data.name = name;
@@ -487,13 +504,37 @@ io.on('connection', (socket) => {
     io.to(code).emit('lobby_update', lobbyState(code));
   });
 
+  socket.on('set_category', ({ category }) => {
+    const code = socket.data.room;
+    const room = rooms[code];
+    if (!room || room.host !== socket.id || room.started) return;
+    room.category = WORD_CATEGORIES[category] ? category : '';
+    room.customWord = '';
+  });
+
+  socket.on('set_custom_word', ({ word }) => {
+    const code = socket.data.room;
+    const room = rooms[code];
+    if (!room || room.host !== socket.id || room.started) return;
+    room.customWord = (word || '').trim().slice(0, 20).toLowerCase();
+  });
+
+  socket.on('react_clue', ({ clueIndex, emoji }) => {
+    const code = socket.data.room;
+    const room = rooms[code];
+    if (!room || !['😂','🤔','😮'].includes(emoji)) return;
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player) return;
+    io.to(code).emit('clue_reaction', { playerName: player.name, clueIndex, emoji });
+  });
+
   socket.on('start_game', () => {
     const code = socket.data.room;
     const room = rooms[code];
     if (!room || room.host !== socket.id) return;
     if (room.players.length < 3) return socket.emit('error', 'Need at least 3 players to start.');
     room.started = true;
-    room.word = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+    room.word = pickWord(room);
 
     const count = Math.min(room.impostorCount || 1, maxImpostors(room.players.length));
     const shuffled = [...room.players].sort(() => Math.random() - 0.5);
@@ -562,14 +603,14 @@ io.on('connection', (socket) => {
     const playerName = (name || 'You').trim().slice(0, 16) || 'You';
 
     const shuffledBotNames = [...BOT_NAMES].sort(() => Math.random() - 0.5).slice(0, botCount);
-    const players = [{ id: socket.id, name: playerName, color: color || randomColor(), isBot: false }];
+    const players = [{ id: socket.id, name: playerName, color: randomColor(), isBot: false }];
     shuffledBotNames.forEach((bName, i) => {
       players.push({ id: `bot_${i}_${Date.now()}`, name: bName, color: randomColor(), isBot: true, eliminated: false });
     });
 
     const maxImp = maxImpostors(players.length);
     const impCount = Math.min(Math.max(1, Math.floor(impostorCount) || 1), maxImp);
-    const word = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+    const word = pickWord({ customWord: '', category: '' });
 
     const shuffledForImpostors = [...players].sort(() => Math.random() - 0.5);
     const impostorIds = shuffledForImpostors.slice(0, impCount).map(p => p.id);
@@ -616,7 +657,7 @@ io.on('connection', (socket) => {
     const player = room.players.find(p => p.id === socket.id);
     room.clues.push({ id: socket.id, name: player.name, word: word || null });
     if (word) (room.usedWords || (room.usedWords = new Set())).add(word.toLowerCase());
-    io.to(code).emit('clue_submitted', { name: player.name, word: word || null });
+    io.to(code).emit('clue_submitted', { name: player.name, word: word || null, clueIndex: room.clues.length - 1 });
     room.clueIndex++;
     advanceClueTurn(code);
   });

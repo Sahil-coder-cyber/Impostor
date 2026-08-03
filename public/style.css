@@ -51,6 +51,50 @@ body {
 .stat-chip span { color: #ffde2a; font-weight: 700; }
 .stat-sep { color: #4b4458; }
 
+/* ---- Host extras (category / custom word) ---- */
+
+.host-extras { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 300px; }
+.host-extra-row { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: #b9aed1; }
+.host-extra-row label { min-width: 80px; }
+.host-extra-row select, .host-extra-row input {
+  flex: 1; background: rgba(255,255,255,0.06); border: 1.5px solid #3a2f4d;
+  border-radius: 8px; padding: 6px 10px; color: #f0f0f0; font-size: 0.85rem;
+}
+
+/* ---- Leaderboard ---- */
+
+.leaderboard-btn {
+  background: transparent; border: 1.5px solid #4b4458; color: #9ca3af;
+  padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; margin-top: -4px;
+}
+.leaderboard-btn:hover { border-color: #75dbf4; color: #75dbf4; }
+.leaderboard-list { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 8px; }
+.lb-total { font-size: 0.8rem; color: #b9aed1; text-align: center; margin-bottom: 4px; }
+.lb-total strong { color: #ffde2a; }
+.lb-row {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.04); border: 1px solid #2a2040;
+  border-radius: 10px; padding: 10px 14px;
+}
+.lb-rank { font-size: 0.85rem; color: #75dbf4; font-weight: 700; min-width: 28px; }
+.lb-name { flex: 1; font-weight: 600; color: #f0f0f0; }
+.lb-stat { font-size: 0.8rem; color: #b9aed1; }
+.lb-wr { font-size: 0.8rem; color: #ffde2a; font-weight: 700; min-width: 36px; text-align: right; }
+
+/* ---- Clue reactions ---- */
+
+.clue-react-row { margin-left: 8px; display: inline-flex; gap: 2px; }
+.react-btn {
+  background: none; border: none; cursor: pointer; font-size: 0.95rem;
+  padding: 1px 3px; border-radius: 4px; opacity: 0.45; transition: opacity 0.15s;
+}
+.react-btn:hover { opacity: 1; }
+.react-pop {
+  display: inline-block; margin-left: 6px; font-size: 0.75rem;
+  color: #b9aed1; animation: popFade 2s ease forwards;
+}
+@keyframes popFade { 0%{opacity:1;transform:translateY(0)} 80%{opacity:1} 100%{opacity:0;transform:translateY(-8px)} }
+
 /* ---- Avatars (Among Us style) ---- */
 
 .avatar { position: relative; display: inline-block; }

@@ -21,6 +21,10 @@
         <span class="stat-chip"><span id="stat-impostor-games">0</span> imp</span>
         <span class="stat-sep">·</span>
         <span class="stat-chip"><span id="stat-impostor-winrate">0%</span> imp wr</span>
+        <span class="stat-sep">·</span>
+        <span class="stat-chip"><span id="stat-streak">0</span> streak</span>
+        <span class="stat-sep">·</span>
+        <span class="stat-chip">best <span id="stat-best-streak">0</span></span>
       </div>
     </div>
     <div class="top-bar-right">
@@ -37,6 +41,14 @@
       <button onclick="showScreen('screen-name', 'start')">Start Game</button>
       <button onclick="showScreen('screen-name', 'join')">Join Game</button>
     </div>
+    <button class="leaderboard-btn" onclick="showLeaderboard()">Leaderboard</button>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div id="screen-leaderboard" class="screen">
+    <h2>Leaderboard</h2>
+    <div id="leaderboard-list" class="leaderboard-list"></div>
+    <button class="back-btn" onclick="showScreen('screen-landing')">Back</button>
   </div>
 
   <!-- SINGLE PLAYER -->
@@ -61,7 +73,6 @@
         <button onclick="changeSoloSetting('impostors', 1)">&#43;</button>
       </div>
     </div>
-    <div class="avatar-picker"></div>
     <button onclick="startSolo()">Play</button>
     <p class="error" id="err-solo"></p>
     <button class="back-btn" onclick="showScreen('screen-landing')">Back</button>
@@ -72,7 +83,6 @@
     <h2 id="name-heading"></h2>
     <input id="input-name" type="text" placeholder="Your name" maxlength="16" />
     <input id="input-code" type="text" placeholder="5-digit room code" maxlength="5" style="display:none" />
-    <div class="avatar-picker"></div>
     <button id="btn-name-go" onclick="nameGo()">Continue</button>
     <p class="error" id="err-name"></p>
     <button class="back-btn" onclick="showScreen('screen-landing')">Back</button>
@@ -111,6 +121,22 @@
       <button onclick="changeImpostorCount(1)">+</button>
     </div>
     <p id="impostor-count-readonly" class="impostor-control" style="display:none"></p>
+    <div id="host-extras" class="host-extras" style="display:none">
+      <div class="host-extra-row">
+        <label>Category</label>
+        <select id="category-select" onchange="setCategory(this.value)">
+          <option value="">Random</option>
+          <option value="nature">Nature</option>
+          <option value="animals">Animals</option>
+          <option value="objects">Objects</option>
+          <option value="misc">Misc</option>
+        </select>
+      </div>
+      <div class="host-extra-row">
+        <label>Custom word</label>
+        <input id="input-custom-word" type="text" placeholder="Leave blank for random" maxlength="20" oninput="setCustomWord(this.value)" />
+      </div>
+    </div>
 
     <p id="lobby-host-note"></p>
     <button id="btn-start" onclick="startGame()" style="display:none">Start Game</button>
