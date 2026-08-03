@@ -107,14 +107,16 @@ socket.on('stats_update', (s) => {
   document.getElementById('stat-impostor-winrate').textContent = impWinRate + '%';
   document.getElementById('stat-streak').textContent = s.currentStreak || 0;
   document.getElementById('stat-best-streak').textContent = s.bestStreak || 0;
-  if (accountLoggedIn) document.getElementById('stats-panel').style.display = 'flex';
+  const onLanding = document.getElementById('screen-landing').classList.contains('active');
+  if (accountLoggedIn && onLanding) document.getElementById('stats-panel').style.display = 'flex';
 });
 
 function showScreen(id, context) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.getElementById('game-browser').style.display = id === 'screen-landing' ? 'flex' : 'none';
-  if (!accountLoggedIn) document.getElementById('stats-panel').style.display = 'none';
+  const onLanding = id === 'screen-landing';
+  document.getElementById('stats-panel').style.display = (accountLoggedIn && onLanding) ? 'flex' : 'none';
 
   if (id === 'screen-name') {
     mode = context;
