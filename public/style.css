@@ -60,6 +60,16 @@ body {
 }
 .stats-row span:last-child { color: #ffde2a; font-weight: 700; }
 
+/* ---- Leaderboard ---- */
+
+.leaderboard-list { width: 100%; max-width: 380px; }
+.lb-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.04); margin-bottom: 6px; font-size: 0.85rem; }
+.lb-rank { color: #ffde2a; font-weight: 700; min-width: 28px; }
+.lb-name { flex: 1; color: #f0f0f0; font-weight: 600; }
+.lb-stat { color: #b9aed1; font-size: 0.78rem; }
+.leaderboard-btn { background: transparent; border: 1.5px solid #4b4458; color: #b9aed1; font-size: 0.85rem; padding: 6px 18px; border-radius: 8px; cursor: pointer; }
+.leaderboard-btn:hover { border-color: #75dbf4; color: #75dbf4; }
+
 /* ---- Game player row ---- */
 
 .game-player-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 8px; }
