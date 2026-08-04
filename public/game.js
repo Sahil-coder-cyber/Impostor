@@ -206,6 +206,7 @@ document.getElementById('input-guess').addEventListener('keydown', e => { if (e.
 // Socket events
 
 socket.on('room_created', ({ code }) => {
+  myRoomCode = code;
   document.getElementById('lobby-code').textContent = code;
   showScreen('screen-lobby');
   document.getElementById('btn-start').style.display = 'block';
@@ -215,6 +216,7 @@ socket.on('room_created', ({ code }) => {
 });
 
 socket.on('room_joined', ({ code }) => {
+  myRoomCode = code;
   document.getElementById('lobby-code').textContent = code;
   showScreen('screen-lobby');
   document.getElementById('btn-start').style.display = 'none';
@@ -636,13 +638,19 @@ socket.on('vote_result', ({ skipped, ejectedName, ejectedColor, wasImpostor, imp
     document.getElementById('impostors-remaining').textContent = '';
     document.getElementById('btn-result-continue').style.display = 'none';
 
+    const iWasEjected = ejectedName === myName;
     setTimeout(() => {
       document.getElementById('result-detail').textContent = wasImpostor
         ? `${ejectedName} was the IMPOSTOR!`
         : `${ejectedName} was NOT the impostor.`;
       document.getElementById('impostors-remaining').textContent = `Impostors remaining: ${impostorsRemaining}`;
-      document.getElementById('btn-result-continue').style.display = '';
-      document.getElementById('btn-result-continue').textContent = 'Continue';
+      if (iWasEjected) {
+        document.getElementById('btn-spectate-ejected').style.display = 'inline-block';
+        document.getElementById('btn-home-ejected').style.display = 'inline-block';
+      } else {
+        document.getElementById('btn-result-continue').style.display = '';
+        document.getElementById('btn-result-continue').textContent = 'Continue';
+      }
     }, 2500);
     return;
   }
@@ -687,6 +695,8 @@ function playAgain() {
 }
 
 function continueAfterVote() {
+  document.getElementById('btn-spectate-ejected').style.display = 'none';
+  document.getElementById('btn-home-ejected').style.display = 'none';
   if (lastVoteWasGameOver) {
     showScreen('screen-landing');
     hideChat();
@@ -786,9 +796,16 @@ function quickJoin(code) {
 // ---- Spectate ----
 
 let isSpectating = false;
+let myRoomCode = '';
 
 function spectateRoom(code) {
   socket.emit('spectate_room', { code });
+}
+
+function spectateAfterEjection() {
+  document.getElementById('btn-spectate-ejected').style.display = 'none';
+  document.getElementById('btn-home-ejected').style.display = 'none';
+  socket.emit('spectate_room', { code: myRoomCode });
 }
 
 socket.on('spectate_started', ({ word, impostors, clues }) => {
