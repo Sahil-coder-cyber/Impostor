@@ -3,33 +3,6 @@ let mode = 'start';
 let myName = '';
 let amIImpostor = false;
 
-async function showLeaderboard() {
-  showScreen('screen-leaderboard');
-  const list = document.getElementById('leaderboard-list');
-  list.innerHTML = '<p style="color:#b9aed1">Loading...</p>';
-  try {
-    const res = await fetch('/api/stats');
-    const data = await res.json();
-    if (!data.topPlayers || data.topPlayers.length === 0) {
-      list.innerHTML = '<p style="color:#b9aed1">No games played yet.</p>';
-      return;
-    }
-    list.innerHTML = '';
-    data.topPlayers.forEach((p, i) => {
-      const wr = p.gamesPlayed ? Math.round((p.wins / p.gamesPlayed) * 100) : 0;
-      const row = document.createElement('div');
-      row.className = 'lb-row';
-      row.innerHTML = `<span class="lb-rank">#${i + 1}</span><span class="lb-name">${p.name}</span><span class="lb-stat">${p.wins}W</span><span class="lb-stat">${wr}% WR</span><span class="lb-stat">${p.gamesPlayed} games</span>`;
-      list.appendChild(row);
-    });
-    const total = document.createElement('p');
-    total.style.cssText = 'color:#b9aed1;font-size:0.8rem;margin-top:12px';
-    total.textContent = `Total games played: ${data.totalGamesPlayed}`;
-    list.appendChild(total);
-  } catch (e) {
-    list.innerHTML = '<p style="color:#f21717">Failed to load leaderboard.</p>';
-  }
-}
 
 // Guest name, CrazyGames-style: "Guest" + random digits, persisted per browser
 function getGuestName() {
