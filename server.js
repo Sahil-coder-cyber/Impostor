@@ -136,12 +136,7 @@ async function connectDB() {
   const uri = process.env.MONGODB_URI;
   if (!uri) { console.log('No MONGODB_URI set — using file storage'); return; }
   try {
-    const client = new MongoClient(uri, {
-      tls: true,
-      tlsAllowInvalidCertificates: true,
-      tlsAllowInvalidHostnames: true,
-      serverSelectionTimeoutMS: 8000,
-    });
+    const client = new MongoClient(uri, { serverSelectionTimeoutMS: 8000 });
     await client.connect();
     db = client.db('impostor');
     for (const u of await db.collection('users').find({}).toArray()) {
