@@ -120,22 +120,36 @@ function showStatsPanel() {
   socket.emit('get_stats', { name: getGuestName() });
 }
 
-if (accountLoggedIn) showStatsPanel();
+if (accountLoggedIn) {
+  // Restore cached stats immediately so the panel isn't blank on reload
+  try {
+    const cached = localStorage.getItem('cachedStats');
+    if (cached) applyStats(JSON.parse(cached));
+  } catch (e) {}
+  showStatsPanel();
+}
 
-socket.on('stats_update', (s) => {
-  s = s || { gamesPlayed: 0, wins: 0, impostorGames: 0, impostorWins: 0, civilianGames: 0, civilianWins: 0 };
-  document.getElementById('stat-games').textContent = s.gamesPlayed;
-  document.getElementById('stat-wins').textContent = s.wins;
-  const winRate = s.gamesPlayed ? Math.round((s.wins / s.gamesPlayed) * 100) : 0;
+function applyStats(s) {
+  s = s || {};
+  document.getElementById('stat-games').textContent = s.gamesPlayed || 0;
+  document.getElementById('stat-wins').textContent = s.wins || 0;
+  const winRate = s.gamesPlayed ? Math.round(((s.wins || 0) / s.gamesPlayed) * 100) : 0;
   document.getElementById('stat-winrate').textContent = winRate + '%';
   document.getElementById('stat-civilian-games').textContent = s.civilianGames || 0;
   const civWinRate = s.civilianGames ? Math.round(((s.civilianWins || 0) / s.civilianGames) * 100) : 0;
   document.getElementById('stat-civilian-winrate').textContent = civWinRate + '%';
-  document.getElementById('stat-impostor-games').textContent = s.impostorGames;
-  const impWinRate = s.impostorGames ? Math.round((s.impostorWins / s.impostorGames) * 100) : 0;
+  document.getElementById('stat-impostor-games').textContent = s.impostorGames || 0;
+  const impWinRate = s.impostorGames ? Math.round(((s.impostorWins || 0) / s.impostorGames) * 100) : 0;
   document.getElementById('stat-impostor-winrate').textContent = impWinRate + '%';
   document.getElementById('stat-streak').textContent = s.currentStreak || 0;
   document.getElementById('stat-best-streak').textContent = s.bestStreak || 0;
+}
+
+socket.on('stats_update', (s) => {
+  s = s || {};
+  applyStats(s);
+  // Cache in localStorage so stats survive page reloads even if server restarted
+  try { localStorage.setItem('cachedStats', JSON.stringify(s)); } catch (e) {}
   const onLanding = document.getElementById('screen-landing').classList.contains('active');
   if (accountLoggedIn && onLanding) document.getElementById('stats-panel').style.display = 'flex';
 });
@@ -344,8 +358,6 @@ socket.on('game_started', ({ word, isImpostor, fellowImpostors, players }) => {
   document.getElementById('input-guess').value = '';
   document.getElementById('input-guess').disabled = false;
   document.getElementById('guess-status').textContent = '';
-  document.getElementById('btn-play-again').style.display = 'none';
-
   if (isImpostor) {
     document.getElementById('game-role-title').textContent = 'You are the IMPOSTOR';
     document.getElementById('game-word-box').textContent = '???';
@@ -672,7 +684,6 @@ socket.on('vote_result', ({ skipped, ejectedName, ejectedColor, wasImpostor, imp
   }
   lastVoteWasGameOver = false;
   showScreen('screen-result');
-  document.getElementById('btn-play-again').style.display = 'none';
 
   const stage = document.getElementById('eject-stage');
   const wrap = document.getElementById('eject-avatar-wrap');
