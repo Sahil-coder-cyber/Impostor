@@ -18,9 +18,10 @@ socket.emit('join_lobby_browser');
 document.getElementById('qr-code').src =
   `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(window.location.origin)}`;
 
-function setQrForRoom(code) {
-  const url = `${window.location.origin}/?join=${code}`;
+function setQrForRoom(code, spectate) {
+  const url = `${window.location.origin}/?join=${code}${spectate ? '&spectate=1' : ''}`;
   document.getElementById('qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(url)}`;
+  document.getElementById('qr-label').textContent = spectate ? 'Scan to spectate' : 'Scan to join';
 }
 
 // ---- Avatars (Among Us style) ----
@@ -197,7 +198,10 @@ document.getElementById('input-guess').addEventListener('keydown', e => { if (e.
 (function autoJoinFromQR() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('join');
-  if (code && /^\d{5}$/.test(code)) {
+  if (!code || !/^\d{5}$/.test(code)) return;
+  if (params.get('spectate') === '1') {
+    socket.emit('spectate_room', { code });
+  } else {
     myName = getGuestName();
     socket.emit('join_room', { name: myName, code });
   }
@@ -283,9 +287,31 @@ function changeImpostorCount(delta) {
   socket.emit('set_impostor_count', { count: next });
 }
 
+let gamePlayers = [];
+
+function renderGamePlayerRow() {
+  const row = document.getElementById('game-player-row');
+  row.innerHTML = '';
+  gamePlayers.forEach(p => {
+    const slot = document.createElement('div');
+    slot.className = 'game-avatar-slot' + (p.eliminated ? ' eliminated' : '');
+    slot.id = 'game-avatar-' + p.id;
+    const av = createAvatarEl(p.color, 32);
+    const label = document.createElement('div');
+    label.className = 'game-avatar-name';
+    label.textContent = p.name;
+    slot.appendChild(av);
+    slot.appendChild(label);
+    row.appendChild(slot);
+  });
+}
+
 socket.on('game_started', ({ word, isImpostor, fellowImpostors, players }) => {
+  gamePlayers = players.map(p => ({ ...p, eliminated: false }));
   amIImpostor = isImpostor;
   showScreen('screen-game');
+  renderGamePlayerRow();
+  setQrForRoom(myRoomCode, true);
   const guessArea = document.getElementById('guess-area');
   document.getElementById('input-guess').value = '';
   document.getElementById('input-guess').disabled = false;
@@ -602,6 +628,10 @@ socket.on('voting_started', ({ players }) => {
 });
 
 socket.on('vote_result', ({ skipped, ejectedName, ejectedColor, wasImpostor, impostorsRemaining }) => {
+  if (!skipped && ejectedName) {
+    const p = gamePlayers.find(p => p.name === ejectedName);
+    if (p) { p.eliminated = true; renderGamePlayerRow(); }
+  }
   if (isSpectating) {
     if (skipped) {
       document.getElementById('spectate-status').textContent = 'Vote skipped — next clue round starting...';
@@ -670,7 +700,7 @@ socket.on('guess_result', ({ correct, attemptsLeft }) => {
   }
 });
 
-socket.on('game_over', ({ winner, reason }) => {
+socket.on('game_over', ({ winner, reason, impostorNames }) => {
   if (isSpectating) {
     const status = document.getElementById('spectate-status');
     status.textContent = (winner === 'civilians' ? 'Civilians Win! ' : 'Impostor Wins! ') + reason;
@@ -683,8 +713,17 @@ socket.on('game_over', ({ winner, reason }) => {
   document.getElementById('impostors-remaining').textContent = '';
   document.getElementById('result-title').textContent = winner === 'civilians' ? 'Civilians Win!' : 'Impostor Wins!';
   document.getElementById('result-detail').textContent = reason;
+
+  const reveal = document.getElementById('impostor-reveal');
+  if (impostorNames && impostorNames.length) {
+    reveal.textContent = `The impostor${impostorNames.length > 1 ? 's' : ''}: ${impostorNames.join(', ')}`;
+    reveal.style.display = 'block';
+  } else {
+    reveal.style.display = 'none';
+  }
+
   document.getElementById('btn-result-continue').textContent = 'Back to Home';
-  document.getElementById('btn-play-again').style.display = 'inline-block';
+  document.getElementById('btn-result-continue').style.display = 'inline-block';
 
   const onWinningTeam = (winner === 'impostor' && amIImpostor) || (winner === 'civilians' && !amIImpostor);
   if (onWinningTeam) playWin(); else playLose();
@@ -697,6 +736,7 @@ function playAgain() {
 function continueAfterVote() {
   document.getElementById('btn-spectate-ejected').style.display = 'none';
   document.getElementById('btn-home-ejected').style.display = 'none';
+  document.getElementById('impostor-reveal').style.display = 'none';
   if (lastVoteWasGameOver) {
     showScreen('screen-landing');
     hideChat();

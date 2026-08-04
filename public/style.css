@@ -60,6 +60,18 @@ body {
 }
 .stats-row span:last-child { color: #ffde2a; font-weight: 700; }
 
+/* ---- Game player row ---- */
+
+.game-player-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 8px; }
+.game-avatar-slot { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.game-avatar-name { font-size: 0.62rem; color: #b9aed1; max-width: 44px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.game-avatar-slot.eliminated { opacity: 0.3; }
+.game-avatar-slot.eliminated .game-avatar-name { text-decoration: line-through; }
+
+/* ---- Impostor reveal ---- */
+
+.impostor-reveal { color: #f21717; font-weight: 700; font-size: 1rem; }
+
 /* ---- Host extras (category / custom word) ---- */
 
 .host-extras { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 300px; }

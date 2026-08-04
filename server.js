@@ -214,7 +214,8 @@ function endGame(code, winner, reason) {
   if (!room) return;
   room.gameOver = true;
   if (!room.isSolo) totalGamesPlayed++;
-  io.to(code).emit('game_over', { winner, reason });
+  const impostorNames = room.impostorIds.map(id => room.players.find(p => p.id === id)?.name).filter(Boolean);
+  io.to(code).emit('game_over', { winner, reason, impostorNames });
   recordGameResult(room, winner);
   broadcastRoomsList();
 }
@@ -558,7 +559,7 @@ io.on('connection', (socket) => {
         word: isImpostor ? null : room.word,
         isImpostor,
         fellowImpostors: isImpostor ? room.impostorIds.filter(id => id !== p.id).map(id => room.players.find(pl => pl.id === id)?.name) : [],
-        players: room.players.map(pl => ({ id: pl.id, name: pl.name }))
+        players: room.players.map(pl => ({ id: pl.id, name: pl.name, color: pl.color }))
       });
     });
 
@@ -592,7 +593,7 @@ io.on('connection', (socket) => {
         word: isImpostor ? null : room.word,
         isImpostor,
         fellowImpostors: isImpostor ? room.impostorIds.filter(id => id !== p.id).map(id => room.players.find(pl => pl.id === id)?.name) : [],
-        players: room.players.map(pl => ({ id: pl.id, name: pl.name }))
+        players: room.players.map(pl => ({ id: pl.id, name: pl.name, color: pl.color }))
       });
     });
 
@@ -642,7 +643,7 @@ io.on('connection', (socket) => {
       word: isImpostor ? null : word,
       isImpostor,
       fellowImpostors,
-      players: players.map(p => ({ id: p.id, name: p.name }))
+      players: players.map(p => ({ id: p.id, name: p.name, color: p.color }))
     });
 
     startCluePhase(code);

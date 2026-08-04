@@ -142,6 +142,7 @@
 
   <!-- GAME -->
   <div id="screen-game" class="screen">
+    <div id="game-player-row" class="game-player-row"></div>
     <h2 id="game-role-title"></h2>
     <div id="game-word-box" class="word-box"></div>
     <p id="game-hint"></p>
@@ -185,10 +186,10 @@
     <h2 id="result-title"></h2>
     <p id="result-detail"></p>
     <p id="impostors-remaining"></p>
+    <p id="impostor-reveal" class="impostor-reveal" style="display:none"></p>
     <button id="btn-result-continue" onclick="continueAfterVote()">Continue</button>
     <button id="btn-spectate-ejected" onclick="spectateAfterEjection()" style="display:none">Spectate</button>
     <button id="btn-home-ejected" onclick="leaveGame()" style="display:none">Back to Home</button>
-    <button id="btn-play-again" onclick="playAgain()" style="display:none">Play Again</button>
     <button class="leave-btn" onclick="leaveGame()">Leave Game</button>
   </div>
 
@@ -244,8 +245,8 @@
 
   <!-- QR CODE (scan to open the game) -->
   <div id="qr-corner" class="qr-corner">
-    <img id="qr-code" alt="Scan to play" />
-    <span>Scan to play</span>
+    <img id="qr-code" alt="Scan to join" />
+    <span id="qr-label">Scan to join</span>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
