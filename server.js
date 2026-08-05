@@ -23,6 +23,19 @@ app.get('/api/stats', (_req, res) => {
   });
 });
 
+app.post('/api/reset-stats', express.json(), (req, res) => {
+  const secret = process.env.RESET_SECRET;
+  if (!secret || req.body.secret !== secret) return res.status(403).json({ error: 'Forbidden' });
+  for (const k of Object.keys(stats)) delete stats[k];
+  totalGamesPlayed = 0;
+  saveData();
+  if (db) {
+    db.collection('stats').deleteMany({}).catch(console.error);
+    db.collection('meta').updateOne({ _id: 'global' }, { $set: { totalGamesPlayed: 0 } }, { upsert: true }).catch(console.error);
+  }
+  res.json({ ok: true });
+});
+
 const WORD_LIST = [
   'apple', 'guitar', 'elephant', 'coffee', 'mountain', 'bicycle',
   'umbrella', 'diamond', 'volcano', 'library', 'submarine', 'rainbow',
