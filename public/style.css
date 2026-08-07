@@ -593,3 +593,77 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
 }
 .qr-corner img { width: 90px; height: 90px; border-radius: 4px; }
 .qr-corner span { font-size: 0.7rem; color: #b9aed1; }
+
+/* ---- Mobile ---- */
+
+@media (max-width: 640px) {
+  body {
+    align-items: flex-start;
+    padding-top: 72px;
+    padding-bottom: 20px;
+    background-attachment: scroll;
+  }
+
+  .top-bar { padding: 8px 12px; }
+
+  .guest-name { font-size: 1rem; }
+
+  .signin-btn { padding: 7px 12px; font-size: 0.8rem; }
+
+  .stats-panel { min-width: 140px; padding: 7px 10px; }
+  .stats-row { font-size: 0.72rem; gap: 8px; }
+
+  .title { font-size: 2.8rem; letter-spacing: 3px; }
+
+  .screen { padding: 14px 14px; gap: 12px; }
+
+  button { padding: 12px 22px; font-size: 1rem; }
+
+  .btn-group { gap: 10px; }
+
+  .word-box { padding: 18px 24px; font-size: 1.4rem; letter-spacing: 2px; }
+
+  .lobby-circle { height: 200px; max-width: 280px; }
+
+  /* Hide game browser on mobile — users join by code */
+  .game-browser { display: none !important; }
+
+  /* Hide QR corner on mobile — already on mobile */
+  .qr-corner { display: none !important; }
+
+  /* Chat: slide up from bottom instead of fixed on the left */
+  .chat-panel {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    border-radius: 12px 12px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    max-height: 46vh;
+  }
+  .chat-panel.minimized { max-height: none; bottom: 0; }
+
+  /* Give screens breathing room above the chat panel */
+  #screen-game.active,
+  #screen-vote.active,
+  #screen-result.active,
+  #screen-spectate.active { padding-bottom: 200px; }
+
+  .eject-stage { height: 110px; }
+
+  .code-box { padding: 10px 18px; font-size: 1.1rem; }
+
+  .clue-input-row { flex-direction: column; }
+  .clue-input-row button { width: 100%; }
+
+  #guess-area button { width: 100%; }
+
+  .solo-setting-row { font-size: 0.95rem; }
+
+  .host-extras { max-width: 100%; }
+
+  .lb-stat { display: none; }
+}
