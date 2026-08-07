@@ -822,7 +822,7 @@ function renderGameBrowser(list) {
     code.textContent = 'Room ' + r.code;
     const info = document.createElement('span');
     info.className = 'room-entry-info';
-    info.textContent = `${r.playerCount} player${r.playerCount !== 1 ? 's' : ''} · ${r.started ? 'In progress' : 'Waiting to start'}`;
+    info.textContent = `${r.hostName ? r.hostName + ' · ' : ''}${r.playerCount} player${r.playerCount !== 1 ? 's' : ''} · ${r.started ? 'In progress' : 'Waiting to start'}`;
     const btn = document.createElement('button');
     if (!r.started) {
       btn.className = 'room-entry-btn join-btn';

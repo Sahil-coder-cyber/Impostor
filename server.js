@@ -185,8 +185,10 @@ function publicRoomsList() {
     .map(([code, room]) => ({
       code,
       playerCount: room.players.filter(p => !p.isBot).length,
-      started: room.started
-    }));
+      started: room.started,
+      hostName: room.players.find(p => p.id === room.host)?.name || ''
+    }))
+    .filter(r => r.playerCount > 0);
 }
 
 function broadcastRoomsList() {
