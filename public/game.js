@@ -16,24 +16,23 @@ let amIImpostor = false;
 
   const spans = Array.from(el.querySelectorAll('.title-letter'));
 
-  function scramble() {
-    const span = spans[Math.floor(Math.random() * spans.length)];
-    const orig = span.dataset.ch;
-    const steps = 3 + Math.floor(Math.random() * 4);
+  function scrambleAll() {
+    const steps = 6 + Math.floor(Math.random() * 5);
     let i = 0;
-    span.classList.add('scrambling');
+    spans.forEach(s => s.classList.add('scrambling'));
     const iv = setInterval(() => {
-      span.textContent = RUNES[Math.floor(Math.random() * RUNES.length)];
+      spans.forEach(s => {
+        s.textContent = RUNES[Math.floor(Math.random() * RUNES.length)];
+      });
       i++;
       if (i >= steps) {
         clearInterval(iv);
-        span.textContent = orig;
-        span.classList.remove('scrambling');
+        spans.forEach(s => { s.textContent = s.dataset.ch; s.classList.remove('scrambling'); });
+        setTimeout(scrambleAll, 1500 + Math.random() * 2000);
       }
     }, 70);
-    setTimeout(scramble, 250 + Math.random() * 600);
   }
-  scramble();
+  scrambleAll();
 })();
 
 
