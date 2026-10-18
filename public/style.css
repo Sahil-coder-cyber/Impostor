@@ -269,13 +269,6 @@ body {
   white-space: nowrap;
 }
 
-.title-letter {
-  display: inline-block;
-  transition: filter 0.05s;
-}
-.title-letter.scrambling {
-  filter: drop-shadow(0 0 8px #75dbf4) brightness(1.4);
-}
 
 @keyframes titleshift {
   0%   { background-position: 0% 50%; }

@@ -3,36 +3,30 @@ let mode = 'start';
 let myName = '';
 let amIImpostor = false;
 
-// ---- Loki title effect ----
+// ---- Cycling font title ----
 (function lokiTitle() {
-  const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛋᛏᛒᛖᛗᛚᛜᛞᛟ';
-  const WORD = 'IMPOSTOR';
+  const FONTS = [
+    "'Cinzel Decorative', serif",
+    "'Orbitron', sans-serif",
+    "'Bebas Neue', sans-serif",
+    "'Russo One', sans-serif",
+    "'Teko', sans-serif",
+    "'Righteous', sans-serif",
+    "'Oswald', sans-serif",
+    "'Permanent Marker', cursive",
+  ];
   const el = document.getElementById('main-title');
   if (!el) return;
-
-  el.innerHTML = WORD.split('').map((ch, i) =>
-    `<span class="title-letter" data-ch="${ch}">${ch}</span>`
-  ).join('');
-
-  const spans = Array.from(el.querySelectorAll('.title-letter'));
-
-  function scrambleAll() {
-    const steps = 6 + Math.floor(Math.random() * 5);
-    let i = 0;
-    spans.forEach(s => s.classList.add('scrambling'));
-    const iv = setInterval(() => {
-      spans.forEach(s => {
-        s.textContent = RUNES[Math.floor(Math.random() * RUNES.length)];
-      });
-      i++;
-      if (i >= steps) {
-        clearInterval(iv);
-        spans.forEach(s => { s.textContent = s.dataset.ch; s.classList.remove('scrambling'); });
-        setTimeout(scrambleAll, 1500 + Math.random() * 2000);
-      }
-    }, 70);
-  }
-  scrambleAll();
+  let idx = 0;
+  setInterval(() => {
+    idx = (idx + 1) % FONTS.length;
+    el.style.transition = 'opacity 0.12s';
+    el.style.opacity = '0';
+    setTimeout(() => {
+      el.style.fontFamily = FONTS[idx];
+      el.style.opacity = '1';
+    }, 120);
+  }, 700);
 })();
 
 
