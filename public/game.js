@@ -3,30 +3,61 @@ let mode = 'start';
 let myName = '';
 let amIImpostor = false;
 
-// ---- Cycling font title ----
+// ---- Loki-style cycling font title ----
 (function lokiTitle() {
   const FONTS = [
-    "'Cinzel Decorative', serif",
-    "'Orbitron', sans-serif",
-    "'Bebas Neue', sans-serif",
-    "'Russo One', sans-serif",
-    "'Teko', sans-serif",
-    "'Righteous', sans-serif",
-    "'Oswald', sans-serif",
-    "'Permanent Marker', cursive",
+    ["'Cinzel Decorative', serif",       "6px"],   // classical Roman ornate
+    ["'UnifrakturMaguntia', cursive",    "2px"],   // German blackletter
+    ["'Pirata One', cursive",            "4px"],   // medieval pirate
+    ["'Uncial Antiqua', cursive",        "3px"],   // Celtic uncial
+    ["'Caesar Dressing', cursive",       "3px"],   // Roman decorative
+    ["'Limelight', cursive",             "5px"],   // Art Deco
+    ["'Poiret One', cursive",            "6px"],   // Art Deco thin
+    ["'Diplomata SC', cursive",          "3px"],   // ornate display
+    ["'Inknut Antiqua', serif",          "4px"],   // historical serif
+    ["'Playfair Display', serif",        "4px"],   // Victorian serif
+    ["'Abril Fatface', cursive",         "3px"],   // bold slab
+    ["'Almendra Display', cursive",      "3px"],   // fantasy ornate
+    ["'Jim Nightshade', cursive",        "2px"],   // vintage ornate
+    ["'Special Elite', cursive",         "4px"],   // typewriter
+    ["'Lobster', cursive",               "2px"],   // retro script
+    ["'Kaushan Script', cursive",        "2px"],   // bold brush script
+    ["'Yellowtail', cursive",            "2px"],   // retro brush
+    ["'Dancing Script', cursive",        "2px"],   // elegant cursive
+    ["'Great Vibes', cursive",           "1px"],   // flowing script
+    ["'Satisfy', cursive",               "2px"],   // casual script
+    ["'Pacifico', cursive",              "1px"],   // surfer cursive
+    ["'Amatic SC', cursive",             "6px"],   // hand-drawn tall
+    ["'Permanent Marker', cursive",      "2px"],   // marker handwritten
+    ["'Rock Salt', cursive",             "0px"],   // rough handwritten
+    ["'Monoton', cursive",               "4px"],   // retro neon outline
+    ["'Orbitron', sans-serif",           "4px"],   // sci-fi
+    ["'Bebas Neue', sans-serif",         "8px"],   // bold condensed
+    ["'Russo One', sans-serif",          "4px"],   // heavy rounded
+    ["'Righteous', sans-serif",          "4px"],   // rounded display
+    ["'Oswald', sans-serif",             "6px"],   // strong condensed
   ];
+
   const el = document.getElementById('main-title');
   if (!el) return;
+
+  // Shuffle so it doesn't always start the same way
+  for (let i = FONTS.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [FONTS[i], FONTS[j]] = [FONTS[j], FONTS[i]];
+  }
+
   let idx = 0;
   setInterval(() => {
     idx = (idx + 1) % FONTS.length;
-    el.style.transition = 'opacity 0.12s';
+    el.style.transition = 'opacity 0.1s';
     el.style.opacity = '0';
     setTimeout(() => {
-      el.style.fontFamily = FONTS[idx];
+      el.style.fontFamily = FONTS[idx][0];
+      el.style.letterSpacing = FONTS[idx][1];
       el.style.opacity = '1';
-    }, 120);
-  }, 700);
+    }, 100);
+  }, 650);
 })();
 
 
