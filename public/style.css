@@ -254,23 +254,32 @@ body {
 .top-bar-right .signin-btn:nth-child(2):hover { background: linear-gradient(135deg, #5eead4, #14b8a6); }
 
 .title {
-  font-size: 5.5rem;
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 5rem;
   font-weight: 900;
   letter-spacing: 6px;
   text-transform: uppercase;
-  background: linear-gradient(90deg, #f21717, #ffde2a, #75dbf4, #a855f7);
-  background-size: 300% 100%;
+  background: linear-gradient(90deg, #f21717, #ffde2a, #75dbf4, #a855f7, #f21717);
+  background-size: 400% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: titleshift 6s ease-in-out infinite;
-  filter: drop-shadow(0 0 18px rgba(242, 23, 23, 0.35));
+  animation: titleshift 4s linear infinite;
+  filter: drop-shadow(0 0 22px rgba(242, 23, 23, 0.45));
+  white-space: nowrap;
+}
+
+.title-letter {
+  display: inline-block;
+  transition: filter 0.05s;
+}
+.title-letter.scrambling {
+  filter: drop-shadow(0 0 8px #75dbf4) brightness(1.4);
 }
 
 @keyframes titleshift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
 }
 
 .btn-group { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; justify-content: center; }
@@ -613,7 +622,7 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
   .stats-panel { min-width: 140px; padding: 7px 10px; }
   .stats-row { font-size: 0.72rem; gap: 8px; }
 
-  .title { font-size: 2.8rem; letter-spacing: 3px; }
+  .title { font-size: 2rem; letter-spacing: 2px; }
 
   .screen { padding: 14px 14px; gap: 12px; }
 

@@ -3,6 +3,39 @@ let mode = 'start';
 let myName = '';
 let amIImpostor = false;
 
+// ---- Loki title effect ----
+(function lokiTitle() {
+  const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛋᛏᛒᛖᛗᛚᛜᛞᛟ';
+  const WORD = 'IMPOSTOR';
+  const el = document.getElementById('main-title');
+  if (!el) return;
+
+  el.innerHTML = WORD.split('').map((ch, i) =>
+    `<span class="title-letter" data-ch="${ch}">${ch}</span>`
+  ).join('');
+
+  const spans = Array.from(el.querySelectorAll('.title-letter'));
+
+  function scramble() {
+    const span = spans[Math.floor(Math.random() * spans.length)];
+    const orig = span.dataset.ch;
+    const steps = 3 + Math.floor(Math.random() * 4);
+    let i = 0;
+    span.classList.add('scrambling');
+    const iv = setInterval(() => {
+      span.textContent = RUNES[Math.floor(Math.random() * RUNES.length)];
+      i++;
+      if (i >= steps) {
+        clearInterval(iv);
+        span.textContent = orig;
+        span.classList.remove('scrambling');
+      }
+    }, 70);
+    setTimeout(scramble, 250 + Math.random() * 600);
+  }
+  scramble();
+})();
+
 
 // Guest name, CrazyGames-style: "Guest" + random digits, persisted per browser
 function getGuestName() {
