@@ -267,6 +267,12 @@ body {
   animation: titleshift 4s linear infinite;
   filter: drop-shadow(0 0 22px rgba(242, 23, 23, 0.45));
   white-space: nowrap;
+  /* Fixed height so font changes never shift the buttons below */
+  height: 8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
 }
 
 
@@ -615,7 +621,7 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
   .stats-panel { min-width: 140px; padding: 7px 10px; }
   .stats-row { font-size: 0.72rem; gap: 8px; }
 
-  .title { font-size: 2rem; letter-spacing: 2px; }
+  .title { font-size: 2rem; letter-spacing: 2px; height: 4rem; }
 
   .screen { padding: 14px 14px; gap: 12px; }
 
