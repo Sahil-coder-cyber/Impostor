@@ -41,23 +41,40 @@ let amIImpostor = false;
   const el = document.getElementById('main-title');
   if (!el) return;
 
-  // Shuffle so it doesn't always start the same way
-  for (let i = FONTS.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [FONTS[i], FONTS[j]] = [FONTS[j], FONTS[i]];
+  let queue = [];
+  let lastFont = null;
+
+  function refill() {
+    const arr = [...FONTS];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    // Avoid the same font appearing at the cycle boundary
+    if (lastFont && arr[0][0] === lastFont) {
+      const swap = arr.findIndex((f, i) => i > 0 && f[0] !== lastFont);
+      if (swap > 0) [arr[0], arr[swap]] = [arr[swap], arr[0]];
+    }
+    queue = arr;
   }
 
-  let idx = 0;
+  refill();
+
+  const FADE = 100;   // ms fade out/in
+  const HOLD = 650;   // ms each font is shown (same for every font)
+
   setInterval(() => {
-    idx = (idx + 1) % FONTS.length;
-    el.style.transition = 'opacity 0.1s';
+    if (!queue.length) refill();
+    const [font, spacing] = queue.shift();
+    lastFont = font;
+    el.style.transition = `opacity ${FADE}ms`;
     el.style.opacity = '0';
     setTimeout(() => {
-      el.style.fontFamily = FONTS[idx][0];
-      el.style.letterSpacing = FONTS[idx][1];
+      el.style.fontFamily = font;
+      el.style.letterSpacing = spacing;
       el.style.opacity = '1';
-    }, 100);
-  }, 650);
+    }, FADE);
+  }, HOLD);
 })();
 
 
