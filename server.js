@@ -12,8 +12,56 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/api/stats', (_req, res) => {
-  res.json({
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function statsPageHtml(data) {
+  const rows = [
+    ['Players online now', data.onlineNow],
+    ['Unique visitors', data.uniqueVisitors],
+    ['Registered accounts', data.totalAccounts],
+    ['Multiplayer games played', data.totalGamesPlayed],
+    ['Solo games played', data.totalSoloGames],
+  ].map(([label, value]) => `<li><span>${label}</span><strong>${value}</strong></li>`).join('');
+  const players = data.topPlayers.length
+    ? data.topPlayers.map((p, i) => {
+        const wr = p.gamesPlayed ? Math.round((p.wins / p.gamesPlayed) * 100) : 0;
+        return `<li><span class="rank">#${i + 1}</span><span class="name">${escapeHtml(p.name)}</span><span class="rec">${p.wins}W / ${p.gamesPlayed}G</span><strong>${wr}%</strong></li>`;
+      }).join('')
+    : '<li class="empty">No games played yet.</li>';
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Impostor Stats</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;color:#f0f0f0;font-family:'Segoe UI',sans-serif;padding:32px 16px;
+background:radial-gradient(circle at 15% 20%,rgba(242,23,23,.25),transparent 40%),radial-gradient(circle at 85% 15%,rgba(117,219,244,.25),transparent 40%),radial-gradient(circle at 90% 80%,rgba(168,85,247,.2),transparent 40%),linear-gradient(135deg,#0d0d1a,#161023 60%,#1a0d1f);background-attachment:fixed}
+.wrap{max-width:480px;margin:0 auto}
+h1{text-align:center;font-size:2.4rem;font-weight:900;letter-spacing:4px;text-transform:uppercase;margin-bottom:24px;
+background:linear-gradient(90deg,#f21717,#ffde2a,#75dbf4,#a855f7,#f21717);background-size:400% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shift 4s linear infinite}
+@keyframes shift{to{background-position:100% 50%}}
+h2{color:#75dbf4;font-size:1rem;letter-spacing:1px;text-transform:uppercase;margin:24px 0 10px}
+ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+li{display:flex;align-items:center;gap:10px;background:rgba(28,22,38,.85);border:1px solid #3a2f4d;border-left:4px solid #75dbf4;border-radius:10px;padding:12px 16px}
+li:nth-child(5n+1){border-left-color:#f21717}li:nth-child(5n+2){border-left-color:#ffde2a}li:nth-child(5n+3){border-left-color:#34d399}li:nth-child(5n+4){border-left-color:#a855f7}li:nth-child(5n+5){border-left-color:#fb923c}
+li span:first-child{flex:1;color:#b9aed1}
+li strong{color:#ffde2a;font-size:1.1rem}
+.rank{flex:0 0 auto!important;min-width:32px;color:#75dbf4!important;font-weight:700}
+.name{flex:1;color:#f0f0f0;font-weight:600}
+.rec{color:#b9aed1;font-size:.8rem}
+.empty{justify-content:center;color:#b9aed1}
+a{display:block;text-align:center;margin-top:28px;color:#75dbf4;text-decoration:none}
+</style></head><body><div class="wrap">
+<h1>Impostor Stats</h1>
+<h2>Overview</h2><ul>${rows}</ul>
+<h2>Top Players</h2><ul>${players}</ul>
+<a href="/">&larr; Back to the game</a>
+</div></body></html>`;
+}
+
+app.get('/api/stats', (req, res) => {
+  const data = {
     totalGamesPlayed,
     totalSoloGames,
     uniqueVisitors: Object.keys(visitors).length,
@@ -23,7 +71,12 @@ app.get('/api/stats', (_req, res) => {
       .sort(([, a], [, b]) => b.wins - a.wins)
       .slice(0, 10)
       .map(([name, s]) => ({ name, ...s }))
-  });
+  };
+  // Browsers get a styled page; fetch() calls (leaderboard) and ?format=json get JSON
+  if (req.query.format !== 'json' && (req.headers.accept || '').includes('text/html')) {
+    return res.send(statsPageHtml(data));
+  }
+  res.json(data);
 });
 
 app.get('/api/reset-stats', (req, res) => {
