@@ -602,6 +602,8 @@ input:focus { border-color: #75dbf4; box-shadow: 0 0 0 3px rgba(117, 219, 244, 0
 .qr-corner img { width: 90px; height: 90px; border-radius: 4px; }
 .qr-corner span { font-size: 0.7rem; color: #b9aed1; }
 
+.online-count { color: #34d399; font-size: 0.85rem; font-weight: 600; min-height: 1.2em; }
+
 /* ---- Mobile ---- */
 
 @media (max-width: 640px) {

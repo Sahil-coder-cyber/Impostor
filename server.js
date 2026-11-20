@@ -15,6 +15,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/stats', (_req, res) => {
   res.json({
     totalGamesPlayed,
+    totalSoloGames,
+    uniqueVisitors: Object.keys(visitors).length,
+    onlineNow: io.engine.clientsCount,
     totalAccounts: Object.keys(users).length,
     topPlayers: Object.entries(stats)
       .sort(([, a], [, b]) => b.wins - a.wins)
@@ -121,15 +124,28 @@ const users = {};
 const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const STATS_FILE = path.join(DATA_DIR, 'stats.json');
+const VISITORS_FILE = path.join(DATA_DIR, 'visitors.json');
 let totalGamesPlayed = 0;
+let totalSoloGames = 0;
+const visitors = {}; // visitorId -> first-seen timestamp
 let db = null;
+
+function registerVisitor(id) {
+  if (typeof id !== 'string' || !/^[\w-]{8,64}$/.test(id) || visitors[id]) return;
+  visitors[id] = Date.now();
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(VISITORS_FILE, JSON.stringify(visitors), 'utf8');
+  } catch (e) { console.error('Visitor file save failed:', e.message); }
+  if (db) db.collection('visitors').updateOne({ _id: id }, { $setOnInsert: { firstSeen: visitors[id] } }, { upsert: true }).catch(console.error);
+}
 
 function saveData() {
   // File backup (always, fire-and-forget errors)
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.writeFileSync(USERS_FILE, JSON.stringify(users), 'utf8');
-    fs.writeFileSync(STATS_FILE, JSON.stringify({ stats, totalGamesPlayed }), 'utf8');
+    fs.writeFileSync(STATS_FILE, JSON.stringify({ stats, totalGamesPlayed, totalSoloGames }), 'utf8');
   } catch (e) { console.error('File save failed:', e.message); }
   // MongoDB (fire-and-forget)
   if (db) {
@@ -141,7 +157,7 @@ function saveData() {
       updateOne: { filter: { _id: name }, update: { $set: s }, upsert: true }
     }));
     if (sops.length) db.collection('stats').bulkWrite(sops).catch(console.error);
-    db.collection('meta').updateOne({ _id: 'global' }, { $set: { totalGamesPlayed } }, { upsert: true }).catch(console.error);
+    db.collection('meta').updateOne({ _id: 'global' }, { $set: { totalGamesPlayed, totalSoloGames } }, { upsert: true }).catch(console.error);
   }
 }
 
@@ -161,6 +177,8 @@ async function connectDB() {
     }
     const meta = await db.collection('meta').findOne({ _id: 'global' });
     if (meta && meta.totalGamesPlayed) totalGamesPlayed = meta.totalGamesPlayed;
+    if (meta && meta.totalSoloGames) totalSoloGames = meta.totalSoloGames;
+    for (const v of await db.collection('visitors').find({}).toArray()) visitors[v._id] = v.firstSeen;
     console.log(`MongoDB: ${Object.keys(users).length} accounts, ${totalGamesPlayed} total games`);
   } catch (e) {
     console.error('MongoDB connection failed, falling back to files:', e.message);
@@ -223,7 +241,8 @@ function endGame(code, winner, reason) {
   const room = rooms[code];
   if (!room) return;
   room.gameOver = true;
-  if (!room.isSolo) totalGamesPlayed++;
+  if (room.isSolo) totalSoloGames++;
+  else totalGamesPlayed++;
   const impostorNames = room.impostorIds.map(id => room.players.find(p => p.id === id)?.name).filter(Boolean);
   io.to(code).emit('game_over', { winner, reason, impostorNames });
   recordGameResult(room, winner);
@@ -427,6 +446,9 @@ function advanceClueTurn(code) {
 // ---- Socket handlers ----
 
 io.on('connection', (socket) => {
+  io.emit('online_count', io.engine.clientsCount);
+
+  socket.on('hello', ({ visitorId } = {}) => registerVisitor(visitorId));
 
   socket.on('join_lobby_browser', () => {
     socket.join('lobby_browser');
@@ -803,6 +825,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    io.emit('online_count', io.engine.clientsCount);
     if (socket.data.spectating) return;
     const code = socket.data.room;
     if (!code || !rooms[code]) return;
@@ -858,7 +881,9 @@ async function start() {
         const saved = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
         if (saved.stats) Object.assign(stats, saved.stats);
         if (saved.totalGamesPlayed) totalGamesPlayed = saved.totalGamesPlayed;
+        if (saved.totalSoloGames) totalSoloGames = saved.totalSoloGames;
       }
+      if (fs.existsSync(VISITORS_FILE)) Object.assign(visitors, JSON.parse(fs.readFileSync(VISITORS_FILE, 'utf8')));
       console.log(`File storage: ${Object.keys(users).length} accounts, ${totalGamesPlayed} total games`);
     } catch (e) { console.error('Failed to load file data:', e.message); }
   }

@@ -90,6 +90,20 @@ function getGuestName() {
 document.getElementById('guest-name').textContent = getGuestName();
 socket.emit('join_lobby_browser');
 
+// Anonymous visitor id so the server can count unique players
+function getVisitorId() {
+  let id = localStorage.getItem('visitorId');
+  if (!id) {
+    id = 'v' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('visitorId', id);
+  }
+  return id;
+}
+socket.on('connect', () => socket.emit('hello', { visitorId: getVisitorId() }));
+socket.on('online_count', (n) => {
+  document.getElementById('online-count').textContent = n + ' player' + (n === 1 ? '' : 's') + ' online';
+});
+
 document.getElementById('qr-code').src =
   `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(window.location.origin)}`;
 
