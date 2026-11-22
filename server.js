@@ -30,6 +30,13 @@ function statsPageHtml(data) {
         return `<li><span class="rank">#${i + 1}</span><span class="name">${escapeHtml(p.name)}</span><span class="rec">${p.wins}W / ${p.gamesPlayed}G</span><strong>${wr}%</strong></li>`;
       }).join('')
     : '<li class="empty">No games played yet.</li>';
+  const accountsSection = data.accounts
+    ? `<h2>Registered Accounts (${data.accounts.length})</h2><ul>${
+        data.accounts.length
+          ? data.accounts.map(n => `<li><span class="name">${escapeHtml(n)}</span></li>`).join('')
+          : '<li class="empty">No accounts yet.</li>'
+      }</ul>`
+    : '';
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Impostor Stats</title>
@@ -56,6 +63,7 @@ a{display:block;text-align:center;margin-top:28px;color:#75dbf4;text-decoration:
 <h1>Impostor Stats</h1>
 <h2>Overview</h2><ul>${rows}</ul>
 <h2>Top Players</h2><ul>${players}</ul>
+${accountsSection}
 <a href="/">&larr; Back to the game</a>
 </div></body></html>`;
 }
@@ -72,6 +80,9 @@ app.get('/api/stats', (req, res) => {
       .slice(0, 10)
       .map(([name, s]) => ({ name, ...s }))
   };
+  // Usernames may be real emails, so only the owner (with the secret) sees them
+  const secret = process.env.RESET_SECRET;
+  if (secret && req.query.secret === secret) data.accounts = Object.keys(users).sort();
   // Browsers get a styled page; fetch() calls (leaderboard) and ?format=json get JSON
   if (req.query.format !== 'json' && (req.headers.accept || '').includes('text/html')) {
     return res.send(statsPageHtml(data));
